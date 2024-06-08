@@ -37,6 +37,23 @@
       || "";
   }
 
+  async function queueVideo(videoID: string, authorID: string) {
+    console.log("add a video", videoID, authorID);
+    const resp = await fetch('/api/yt/video/queue', {
+      method: 'POST',
+      body: JSON.stringify({videoID, authorID}),
+      headers: {
+				'content-type': 'application/json',
+			},
+    });
+
+    const data = await resp.json();
+    if (data.error) {
+      // mark it broke?
+    }
+    console.log('queue response', data);
+  }  
+
   async function addVideo(videoID: string, authorID: string) {
     console.log("add a video", videoID, authorID);
     const resp = await fetch('/api/yt/video', {
@@ -51,7 +68,7 @@
     if (data.error) {
       // mark it broke?
     }
-    console.log('response', data);
+    console.log('dl response', data);
   }
 
   async function handleSubmit() {
@@ -115,11 +132,8 @@
         <p class="mb-3 font-normal text-gray-700 dark:text-gray-400 leading-tight">
           {data.authors[channel.authorID].name}
         </p>
-        <Button class="w-fit" color="light">
-          View <ArrowRightOutline class="w-6 h-6 ms-2 text-black" />
-        </Button>
-        <Button class="w-fit" color="light">
-          Add <DownloadOutline class="w-6 h-6 ms-2 text-black" />
+        <Button size="xs" class="w-fit" color="light">
+          Follow <DownloadOutline class="w-4 h-4 ms-2 text-black" />
         </Button>
 
       </Card>
@@ -132,10 +146,12 @@
 {#if data?.videos?.length > 0}
 <VideoCards {...data}>
   <svelte:fragment slot="buttons" let:video>
-    <Button class="w-fit" color="light">
-      View <ArrowRightOutline class="w-6 h-6 ms-2 text-black" />
+    <Button size="xs" class="w-fit" color="light"
+      on:click="{() => queueVideo(video.id, video.authorID)}">
+      Queue <ArrowRightOutline class="w-6 h-6 ms-2 text-black" />
     </Button>
-    <Button class="w-fit" color="light" on:click="{() => addVideo(video.id, video.authorID)}">
+    <Button size="xs" class="w-fit" color="light"
+      on:click="{() => addVideo(video.id, video.authorID)}">
       Add <DownloadOutline class="w-6 h-6 ms-2 text-black" />
     </Button>
   </svelte:fragment>

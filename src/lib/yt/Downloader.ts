@@ -198,7 +198,8 @@ async function saveThumbnails(authorID: string, tns: Thumbnail[]): Promise<YTThu
         resolve(fileName);
       });
       stream.on('error', (err) => {
-        log.error(err, 'broke saving thumbnail');
+        log.error(err);
+        log.error(`broke streaming thumbnail: ${urlStr}`);
         reject(fileName);
       });
     })

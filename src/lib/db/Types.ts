@@ -43,8 +43,7 @@ export interface YTRecord {
   recordType: RecordTypes,
 }
 
-export interface YTQueue {
-  videoID: string,
+export interface YTQueue extends YTRecord {
   authorID: string,
   complete: boolean,
   requestedDate: Date,
