@@ -16,7 +16,7 @@ import bodyParser from 'body-parser';
 import log from './lib/log/Logger'
 
 import * as Util from './lib/utils/Utils';
-import getDB, { getVideos } from "./lib/db/DB";
+import getDB, { getVideos, addQueue } from "./lib/db/DB";
 
 import Logger from 'pino-http'
 const httpLog = Logger({ logger: log })
@@ -25,6 +25,9 @@ import * as YT from './lib/yt/Downloader';
 import { existsSync, createReadStream, ReadStream } from 'fs';
 import ContentDisposition from 'content-disposition';
 import { MediaTypes, RecordTypes, SearchOptions, UploadDate, YTFile, YTThumbnail, YTVideoInfo } from "./lib/db/Types";
+
+import Manager from './lib/queue/Manager';
+Manager.getInstance();
 
 // TODO: env
 const port = +(process.env.YT_PORT || 3000);
@@ -68,6 +71,15 @@ app.get('/api/yt/search', async (req, res) => {
 app.get('/api/yt/video/:authorID/:videoID', async (req, res) => {
   await YT.downloadYTVideo(req.params.videoID, req.params.authorID);
   res.send(req.params.videoID);
+});
+
+app.post('/api/yt/video/queue', async (req, res) => {
+  log.info(req?.body, 'download yt video post called');
+  if (!req?.body || !req.body.authorID || !req.body.videoID) {
+    return res.status(400).send('missing body params {videoID, authorID}')
+  }
+  const resp = await addQueue(req.body.videoID, req.body.authorID);
+  return res.send(resp);
 });
 
 app.post('/api/yt/video', async (req, res) => {

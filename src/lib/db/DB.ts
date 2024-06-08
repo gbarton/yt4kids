@@ -1,4 +1,4 @@
-import { IDB, RecordTypes, YTAuthor, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./Types";
+import { IDB, RecordTypes, YTAuthor, YTQueue, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./Types";
 import LokiDatabase from "./LokiDB";
 
 let builtDb: IDB;
@@ -14,6 +14,30 @@ export default async function getDB(): Promise<IDB> {
   await builtDb.init();
     
   return Promise.resolve(builtDb);
+}
+
+export async function addQueue(videoID: string, authorID: string): Promise<YTQueue> {
+  const DB = await getDB();
+  const q : YTQueue = {
+    authorID,
+    complete: false,
+    requestedDate: new Date(),
+    id: videoID,
+    recordType: RecordTypes.DL_QUEUE
+  }
+  await DB.insertOrUpdateObj<YTQueue>(q);
+  return q;
+}
+
+export async function getQueue(limit: number = 1): Promise<YTQueue[]> {
+  const DB = await getDB();
+  const results = await DB.find<YTQueue>(RecordTypes.DL_QUEUE, {
+    limit,
+    clause: { complete: false },
+    sortBy: 'requestedDate',
+    sortByDescending: true,
+  });
+  return results;
 }
 
 export async function getVideos(): Promise<YTSearchResponse> {
