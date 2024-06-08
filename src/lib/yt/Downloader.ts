@@ -181,7 +181,7 @@ async function saveThumbnails(authorID: string, tns: Thumbnail[]): Promise<YTThu
     const imgRes = await fetch(urlStr);
     if (!imgRes.ok || imgRes.body === null) {
       log.warn(imgRes.status, `unable to fetch url: ${urlStr}`);
-      return reject();
+      return reject(`fetch failed for url: ${urlStr}`);
     }
     const url = new URL(urlStr);
     const fileId = cleanString(url.pathname);
@@ -235,7 +235,7 @@ async function saveThumbnails(authorID: string, tns: Thumbnail[]): Promise<YTThu
   }));
 
   // save all thumbnails
-  const ts = await Promise.all(promises);
+  const ts = await Promise.all(promises).catch((err) => { log.error("issue saving thumbnails"); return []});
   log.info('all thumbnails saved');
   return ts;
 }
