@@ -74,7 +74,7 @@ app.get('/api/yt/video/:authorID/:videoID', async (req, res) => {
 });
 
 app.post('/api/yt/video/queue', async (req, res) => {
-  log.info(req?.body, 'download yt video post called');
+  log.info(req?.body, 'queue yt video post called');
   if (!req?.body || !req.body.authorID || !req.body.videoID) {
     return res.status(400).send('missing body params {videoID, authorID}')
   }

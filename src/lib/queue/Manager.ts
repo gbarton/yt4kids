@@ -37,7 +37,7 @@ export default class Manager {
     if (queue.length == 0) {
       return;
     }
-    log.info(`queue length: ${queue.length}`);
+    log.info(`queue length: ${queue.length}+`);
     
     this.running = true;
     const q = queue[0];
@@ -58,6 +58,7 @@ export default class Manager {
     // SUPER lame way to force it to wait a while longer
     const that = this;
     setTimeout(() => {
+      log.info("manager free");
       that.running = false;
     }, this.interval);
   }

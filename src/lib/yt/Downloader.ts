@@ -401,6 +401,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
       '-loglevel', '8', '-hide_banner',
       // input video and audio by file
       '-i', tmpVideoFile,'-i', tmpAudioFile,
+      // map each input file to what they are v/a
       '-map', '0:v', '-map', '1:a',
       // '-c:v', 'libx264', '-preset', 'slow', '-crf', '18',
       // '-c:a', 'aac', '-vf', 'yuv420p', '-movflags', '+faststart',

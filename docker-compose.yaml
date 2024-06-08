@@ -2,7 +2,7 @@ version: "3.4"
 services:
   yt4kids:
     container_name: yt4kids
-    image: yt4kids
+    image: yt4kids:latest
     # build:
     #   context: .
     restart: always
