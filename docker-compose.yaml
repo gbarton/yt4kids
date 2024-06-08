@@ -1,0 +1,20 @@
+version: "3.4"
+services:
+  yt4kids:
+    container_name: yt4kids
+    image: yt4kids
+    # build:
+    #   context: .
+    restart: always
+    environment:
+      - YT_PORT=3000
+      - YK_STORAGE_DIR=./storage
+      - YK_DB_STORAGE_DIR=./storage/db
+      - YK_LOKI_ADAPTER=disk
+      - YK_DB_TYPE=LOKI
+    ports:
+      - "3001:3000"
+    volumes:
+      - "/disk/1/storage:/app/storage"
+
+    
