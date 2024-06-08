@@ -18,8 +18,8 @@ import log from './lib/log/Logger'
 import * as Util from './lib/utils/Utils';
 import getDB, { getVideos, addQueue } from "./lib/db/DB";
 
-import Logger from 'pino-http'
-const httpLog = Logger({ logger: log })
+// import Logger from 'pino-http'
+// const httpLog = Logger({ logger: log })
 
 import * as YT from './lib/yt/Downloader';
 import { existsSync, createReadStream, ReadStream } from 'fs';
@@ -36,7 +36,7 @@ import path from 'path'
 
 app.use('/', express.static(path.join(__dirname, 'public')));
 
-app.use(httpLog);
+// app.use(httpLog);
 app.use(bodyParser.urlencoded({extended: false}))
 app.use(bodyParser.json())
 
