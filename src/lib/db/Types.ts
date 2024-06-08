@@ -47,6 +47,7 @@ export interface YTQueue {
   videoID: string,
   authorID: string,
   complete: boolean,
+  requestedDate: Date,
 }
 
 export type YTThumbnail = {
@@ -59,6 +60,15 @@ export type YTThumbnail = {
   // by width
   // 88, 176, 360, 720, ??
   size: 'tiny' | 'small' | 'medium' | 'large' | 'xlarge',
+}
+
+/**
+ * Used for videos and channels when content is deemed no good
+ */
+export interface YTBanned {
+  date: Date,
+  by: string,
+  reason: string,
 }
 
 /**
@@ -77,6 +87,8 @@ export interface YTChannelInfo extends YTRecord {
   name: string,
   authorID: string,
   videoIDs: string[],
+  stayUpdated: boolean,
+  banned?: YTBanned,
 }
 
 export interface YTFile extends YTRecord {
@@ -95,6 +107,7 @@ export interface YTVideoInfo extends YTRecord {
   fileID?: string,
   quality?: string,
   format?: string,
+  banned?: YTBanned,
 }
 
 export interface YTSearchResponse {

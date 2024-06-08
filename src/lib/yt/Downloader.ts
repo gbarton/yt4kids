@@ -41,7 +41,9 @@ function getStorageDir(): string {
   return sDir;
 }
 
-
+/**
+ * For debugging, the full record is huge
+ */
 function printAdaptiveFormat(f: any) {
   return {
     has_audio: f.has_audio,
@@ -57,8 +59,7 @@ function printAdaptiveFormat(f: any) {
     has_text: f.has_text,
   }
 }
-
-
+// stuff to rip out of a string
 const forbiddenCharsString = ['}', '{', '%', '>', '<', '^', ';', '`', '$', '"', "@", '='];
 
 function cleanString(str: string) {
@@ -92,16 +93,11 @@ function videoStoragePath(authorId: string, title: string, fileExtention: string
   return `${dir}/${fileSafeStr(title.trim())}.${fileExtention}`;
 }
 
-// function storagePath(m: FileMetaInfo): string {
-//   let dir = `${getStorageDir()}/${m.type}/${fileSafeStr(m.artist)}`;
-//   if (!existsSync(dir)) {
-//     mkdirSync(dir, { recursive: true});
-//     log.info(`created new directory ${dir}`);
-//   }
-//   let filePath = `${dir}/${fileSafeStr(m.title)}.${m.fileExtention}`;
-//   return filePath;
-// }
-
+/**
+ * 
+ * @param ext used to create tmp filenames while we download videos
+ * @returns 
+ */
 function tmpFilePath(ext?: string) {
   const tmpDir = `${getStorageDir()}/tmp`;
   if(!existsSync(tmpDir)) {
@@ -127,6 +123,13 @@ type DLExtraOpts = {
 
 type DLOpts = DownloadOptions & DLExtraOpts;
 
+/**
+ * Downloads a given yt video with the authorID
+ * (cause the yt call doesnt seem to have author data!?)
+ * @param id yt id of the video (what you see in the url)
+ * @param dlObj options to send to innertube
+ * @param path where to store the file
+ */
 async function download(id: string, dlObj: DLOpts, path: string) {
   log.info(dlObj, "Download Options");
   const yt = await getYT();
@@ -163,8 +166,15 @@ async function download(id: string, dlObj: DLOpts, path: string) {
   log.info(`bytes on disk: ${getFilesizeInBytes(path)}/${total}`)
 }
 
+/**
+ * Download thumbnails for a given author
+ * @param authorID id of who we are saving
+ * @param tns thumbnails
+ * @returns 
+ */
 async function saveThumbnails(authorID: string, tns: Thumbnail[]): Promise<YTThumbnail[]> {
   // pull down thumbnails
+  // TODO: need to do some retry logic
   const promises = tns.map((t):Promise<YTThumbnail> => new Promise(async (resolve, reject) => {
     // some of yt's urls dont have http/https and just start at //
     const urlStr = t.url.startsWith('//') ? `http:${t.url}` : t.url;
@@ -281,7 +291,6 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
   // TODO: sort out errors
   if (!info || info === null)
     return { error: 'ErrorCantConnectToServiceAPI' };
-  log.info("1")
 
   if (info.playability_status.status !== 'OK') return { error: 'ErrorYTUnavailable' };
   if (info.basic_info.is_live) return { error: 'ErrorLiveVideo' };
@@ -294,7 +303,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
           critical: true
       }
   }
-  log.info("2")
+
   if (info.streaming_data == null) {
     return { error: "missing streaming info"};
   }
@@ -305,15 +314,6 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
   if (!title || !author) {
     return { error: 'Missing title/author info for video'};
   }
-  log.info("3")
-
-  // if (author !== authorID) {
-  //   log.error(`${author} !== ${authorID}`)
-  //   return { error: 'Author mismatch' };
-  // }
-  // log.info("4")
-
-  // log.info(info.streaming_data.adaptive_formats.map((f) => (printAdaptiveFormat(f))));
 
   // remove formats that we dont want from the list
   const filterByCodec = (formats: Format[] ) => formats.filter(e => 
@@ -328,155 +328,153 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
       adaptiveFormats = filterByCodec(info.streaming_data.adaptive_formats)
   }
 
-    // the first one we find with a video and content will be the best we can get
-    const bestVideoFormat = adaptiveFormats.find(i => i.has_video && i.content_length && i.quality_label);
+  // the first one we find with a video and content will be the best we can get
+  const bestVideoFormat = adaptiveFormats.find(i => i.has_video && i.content_length && i.quality_label);
 
-    if (!bestVideoFormat || bestVideoFormat === null) {
-      return { error: "No suitable video format" }
+  if (!bestVideoFormat || bestVideoFormat === null) {
+    return { error: "No suitable video format" }
+  }
+  log.info(bestVideoFormat, "Best Video Format full");
+  // we know we have a label, we tested for it
+  videoQuality = bestVideoFormat.quality_label || "";
+
+  log.info(`best quality found: ${videoQuality}`);
+  log.info(`codec used: ${format}`);
+
+  // do we have the audio included already?
+  hasAudio = bestVideoFormat.has_audio;
+  log.info(`Video has audio ${hasAudio}`);
+
+  let type: dlType = 'video+audio';
+  if (!hasAudio) {
+    type = 'video';
+    log.info('need to download separate audio file');
+  }
+
+  // download video
+  let dlObj : DLOpts = {
+    type: type,
+    // quality: bestVideoFormat.quality_label,
+    quality: 'best',
+    // format: 'mp4',
+    format: codecMatch[format].fileExtention,
+    contentLength: bestVideoFormat.content_length || 0,
+  }
+
+  const tmpVideoFile = tmpFilePath();
+  let finalTmpFile = tmpVideoFile;
+
+  await download(videoID, dlObj, tmpVideoFile);
+
+  if (!hasAudio) {
+    const filteredAudioFormats = adaptiveFormats.filter((i) => i.has_audio)
+    .sort((a, b) => Number(b.bitrate) - Number(a.bitrate));
+    log.info(filteredAudioFormats.map((f) => (printAdaptiveFormat(f))), "Filtered Audio Formats");
+    const bestAudioFormat = filteredAudioFormats.find((i) => i.has_audio && i.content_length);
+
+    if (!bestAudioFormat || bestAudioFormat === null) {
+      return { error: "No suitable audio format" }
     }
-    log.info(bestVideoFormat, "Best Video Format full");
-    // we know we have a label, we tested for it
-    videoQuality = bestVideoFormat.quality_label || "";
+    log.info(bestAudioFormat, "Best Audio Format full");
 
-    log.info(`best quality found: ${videoQuality}`);
-    log.info(`codec used: ${format}`);
-
-    // do we have the audio included already?
-    hasAudio = bestVideoFormat.has_audio;
-    log.info(`Video has audio ${hasAudio}`);
-
-    let type: dlType = 'video+audio';
-    if (!hasAudio) {
-      type = 'video';
-      log.info('need to download separate audio file');
-    }
-
-    // download video
-    let dlObj : DLOpts = {
-      type: type,
-      // quality: bestVideoFormat.quality_label,
+    dlObj = {
+      type: 'audio',
       quality: 'best',
-      // format: 'mp4',
-      format: codecMatch[format].fileExtention,
-      contentLength: bestVideoFormat.content_length || 0,
+      contentLength: bestAudioFormat.content_length || 0,
     }
 
-    const tmpVideoFile = tmpFilePath();
-    let finalTmpFile = tmpVideoFile;
+    const tmpAudioFile = tmpFilePath();
 
-    await download(videoID, dlObj, tmpVideoFile);
+    await download(videoID, dlObj, tmpAudioFile);
 
-    if (!hasAudio) {
-      // if (hasAudio) {
-      const filteredAudioFormats = adaptiveFormats.filter((i) => i.has_audio)
-      .sort((a, b) => Number(b.bitrate) - Number(a.bitrate));
-      log.info(filteredAudioFormats.map((f) => (printAdaptiveFormat(f))), "Filtered Audio Formats");
-      const bestAudioFormat = filteredAudioFormats.find((i) => i.has_audio && i.content_length);
-  
-      if (!bestAudioFormat || bestAudioFormat === null) {
-        return { error: "No suitable audio format" }
-      }
-      log.info(bestAudioFormat, "Best Audio Format full");
+    const combinedFile = `${tmpFilePath(codecMatch[format].fileExtention)}`;
 
-      dlObj = {
-        type: 'audio',
-        quality: 'best',
-        contentLength: bestAudioFormat.content_length || 0,
-      }
-  
-      const tmpAudioFile = tmpFilePath();
+    // combine with ffmpeg
+    // https://stackoverflow.com/questions/72176714/merge-video-and-audio-using-ffmpeg-in-express-js
+    // https://stackoverflow.com/questions/71257182/merge-audio-with-video-stream-node-js
+    // but mostly
+    // https://github.com/imputnet/cobalt/blob/b1ed1f519985daa20f9c35145ada260d902fa0d8/src/modules/stream/types.js#L86
 
-      await download(videoID, dlObj, tmpAudioFile);
+    let ffmpegCmd: string[] = [
+      // supress non-crucial messages
+      '-loglevel', '8', '-hide_banner',
+      // input video and audio by file
+      '-i', tmpVideoFile,'-i', tmpAudioFile,
+      '-map', '0:v', '-map', '1:a',
+      // '-c:v', 'libx264', '-preset', 'slow', '-crf', '18',
+      // '-c:a', 'aac', '-vf', 'yuv420p', '-movflags', '+faststart',
+      // `${combinedFile}`
+    ];
 
-      const combinedFile = `${tmpFilePath(codecMatch[format].fileExtention)}`;
+    ffmpegCmd = ffmpegCmd.concat(codecMatch[format].ffmpegArgs);
+    ffmpegCmd.push(combinedFile);
 
-      // combine with ffmpeg
-      // https://stackoverflow.com/questions/72176714/merge-video-and-audio-using-ffmpeg-in-express-js
-      // https://stackoverflow.com/questions/71257182/merge-audio-with-video-stream-node-js
-      // but mostly
-      // https://github.com/imputnet/cobalt/blob/b1ed1f519985daa20f9c35145ada260d902fa0d8/src/modules/stream/types.js#L86
-
-      let ffmpegCmd: string[] = [
-        // supress non-crucial messages
-        '-loglevel', '8', '-hide_banner',
-        // input video and audio by file
-        '-i', tmpVideoFile,'-i', tmpAudioFile,
-        '-map', '0:v', '-map', '1:a',
-        // '-c:v', 'libx264', '-preset', 'slow', '-crf', '18',
-        // '-c:a', 'aac', '-vf', 'yuv420p', '-movflags', '+faststart',
-        // `${combinedFile}`
-      ];
-
-      ffmpegCmd = ffmpegCmd.concat(codecMatch[format].ffmpegArgs);
-      ffmpegCmd.push(combinedFile);
-
-      log.info(`${ffmpegPath} ${ffmpegCmd.join(" ")}`);
-
+    log.info(`${ffmpegPath} ${ffmpegCmd.join(" ")}`);
       
-      const ffmpegP = new Promise((resolve, reject) => {
-        // TODO: ffmpegPath can be null
-        const ffmpegProcess = cp.spawn(ffmpegPath || "", ffmpegCmd,
-        {
-          windowsHide: true,
-          stdio: [
-            'inherit', 'inherit', 'inherit',
-            'pipe', 'pipe', 'pipe',
-          ],
-        });
-
-        ffmpegProcess.on('close', () => {
-          log.info("Merging Completed");
-          resolve(combinedFile);
-        });
-        ffmpegProcess.on('error', (err) => {
-          log.error(err, 'could not ffmpeg');
-          reject();
-        });
-
-        log.info('ffmpeg initialization completed');
+    const ffmpegP = new Promise((resolve, reject) => {
+      // TODO: ffmpegPath can be null
+      const ffmpegProcess = cp.spawn(ffmpegPath || "", ffmpegCmd,
+      {
+        windowsHide: true,
+        stdio: [
+          'inherit', 'inherit', 'inherit',
+          'pipe', 'pipe', 'pipe',
+        ],
       });
 
-      await ffmpegP;
-      log.info('completed ffmpeg video merging');
-      finalTmpFile = combinedFile;
-      // process.exit(1);
-      // cleanup audio file
-      rm(tmpAudioFile);
-      // cleanup tmp video file since we combined it
-      rm(tmpVideoFile);
-    }
+      ffmpegProcess.on('close', () => {
+        log.info("Merging Completed");
+        resolve(combinedFile);
+      });
+      ffmpegProcess.on('error', (err) => {
+        log.error(err, 'could not ffmpeg');
+        reject();
+      });
 
-    let fileInfo : YTFile = {
-      fileExtention: codecMatch[format].fileExtention,
-      filename: videoStoragePath(authorID, title),
-      authorID,
-      contentLength: getFilesizeInBytes(finalTmpFile),
-      id: videoID,
-      recordType: RecordTypes.VIDEO_FILE,
-    }
+      log.info('ffmpeg initialization completed');
+    });
 
-    await rename(finalTmpFile, fileInfo.filename);
-    log.info(`File Moved: ${finalTmpFile} to ${fileInfo.filename}`);
-    log.info(fileInfo, 'File Info');
+    await ffmpegP;
+    log.info('completed ffmpeg video merging');
+    finalTmpFile = combinedFile;
+    // process.exit(1);
+    // cleanup audio file
+    rm(tmpAudioFile);
+    // cleanup tmp video file since we combined it
+    rm(tmpVideoFile);
+  }
 
-    const DB = await getDB();
-    await DB.insertOrUpdateObj(fileInfo);
+  let fileInfo : YTFile = {
+    fileExtention: codecMatch[format].fileExtention,
+    filename: videoStoragePath(authorID, title),
+    authorID,
+    contentLength: getFilesizeInBytes(finalTmpFile),
+    id: videoID,
+    recordType: RecordTypes.VIDEO_FILE,
+  }
 
-    const tns = await saveThumbnails(authorID, info.basic_info.thumbnail || []);
+  await rename(finalTmpFile, fileInfo.filename);
+  log.info(`File Moved: ${finalTmpFile} to ${fileInfo.filename}`);
+  log.info(fileInfo, 'File Info');
 
-    const videoRecord: YTVideoInfo = {
-      title,
-      thumbnails: tns,
-      authorID,
-      durationText: `${info.basic_info.duration}`,
-      durationSeconds: info.basic_info.duration || 0,
-      id: videoID,
-      recordType: RecordTypes.VIDEO,
-    }
+  const DB = await getDB();
+  await DB.insertOrUpdateObj(fileInfo);
 
-    await DB.insertOrUpdateObj(videoRecord);
+  const tns = await saveThumbnails(authorID, info.basic_info.thumbnail || []);
 
-    return { videoId: videoID, authorID }
+  const videoRecord: YTVideoInfo = {
+    title,
+    thumbnails: tns,
+    authorID,
+    durationText: `${info.basic_info.duration}`,
+    durationSeconds: info.basic_info.duration || 0,
+    id: videoID,
+    recordType: RecordTypes.VIDEO,
+  }
+
+  await DB.insertOrUpdateObj(videoRecord);
+
+  return { videoId: videoID, authorID }
 }
 
 
@@ -590,9 +588,10 @@ export async function search(query: string, opts : SearchOptions): Promise<YTSea
       const c = channels[i];
       const chanResult : YTChannelInfo = {
         // @ts-ignore
-        name: c["description_snippet"]?.text || "UNKOWN",
+        name: c["description_snippet"]?.text || "UNKNOWN",
         authorID: c.author.id,
         videoIDs: [],
+        stayUpdated: false,
         id: c.id,
         recordType: RecordTypes.CHANNEL,
       }
@@ -600,7 +599,6 @@ export async function search(query: string, opts : SearchOptions): Promise<YTSea
       addAuthorToList(c.author, sr.authors);
     }
   }
-  
-  // log.info(results);
+
   return sr;
 }
