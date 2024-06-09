@@ -35,7 +35,7 @@
 {#if params?.videoID}
 	<Video
 		src="/api/video/chunk/{params.videoID}"
-    preload="metadata"
+    preload="auto"
 		controls
 		crossorigin="anonymous"
 		class="w-full max-w-full h-auto"

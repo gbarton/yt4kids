@@ -98,7 +98,17 @@ app.post('/api/yt/video', async (req, res) => {
 // TODO: filters!
 app.get('/api/search', async (req, res) => {
   log.info('local search called');
-  const results = await getVideos();
+  let searchOpts = {
+    search: "",
+    authorID: undefined,
+    type: "",
+  }
+  searchOpts = {...searchOpts, ...req.query};
+  if (searchOpts.type !== "" && isMediaType(searchOpts.type)) {
+    searchOpts.type = searchOpts.type.toString() as MediaTypes;
+  }
+  log.info(searchOpts, 'searchOpts');
+  const results = await getVideos(searchOpts?.authorID);
   res.send(results);
 });
 
@@ -149,6 +159,10 @@ app.get('/api/video/:id', async (req, res) => {
   return res.send(record);
 });
 
+const contentType: {[key: string]: string} = {
+  "mp4": "video/mp4",
+}
+
 // get a video stream
 app.get('/api/video/chunk/:id', async (req, res) => {
   const id = req.params.id;
@@ -176,10 +190,6 @@ app.get('/api/video/chunk/:id', async (req, res) => {
   let stream: ReadStream;
   let headers: Head;
   let headerCode = 200;
-
-  const contentType: {[key: string]: string} = {
-    "mp4": "video/mp4",
-  }
 
   // found here
   // https://stackoverflow.com/questions/4360060/video-streaming-with-html-5-via-node-js

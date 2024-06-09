@@ -6,6 +6,7 @@ import Watch from './routes/Watch.svelte'
 export default {
   // Exact path
   '/': Home,
+  '/search*': Home,
   '/about': About,
   '/admin': Admin,
   '/watch/:videoID' : Watch,

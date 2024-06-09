@@ -1,4 +1,4 @@
-import { IDB, RecordTypes, YTAuthor, YTQueue, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./Types";
+import { IDB, QueryOptions, RecordTypes, YTAuthor, YTQueue, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./Types";
 import LokiDatabase from "./LokiDB";
 
 let builtDb: IDB;
@@ -40,14 +40,21 @@ export async function getQueue(limit: number = 1): Promise<YTQueue[]> {
   return results;
 }
 
-export async function getVideos(): Promise<YTSearchResponse> {
+export async function getVideos(authorID?: string): Promise<YTSearchResponse> {
   const DB = await getDB();
 
-  const results = await DB.find<YTVideoInfo>(RecordTypes.VIDEO, {
+  const qo: QueryOptions = {
+    // custom sort function because you cant do nested props with simplesort
     sortFunction:  function(o1: any, o2: any) {
-      return o1.meta?.created < o2.meta?.created? -1 : 1;
+      return o1.meta?.created < o2.meta?.created? 1 : -1;
     }
-  });
+  }
+
+  if(authorID) {
+    qo.clause = { authorID };
+  }
+
+  const results = await DB.find<YTVideoInfo>(RecordTypes.VIDEO, qo);
 
   const authors: {[key: string]: YTAuthor} = {};
   // resolve all the authors (unique the id's first)

@@ -7,18 +7,22 @@
   export let authors: {[key: string] : YTAuthor};
 
   function getBestThumbnail(thumbnails: YTThumbnail[]): string {
-  // console.log(thumbnails);
-  const id = thumbnails.find((t) => t.size === 'small')?.fileID
-    || thumbnails.find((t) => t.size === 'tiny')?.fileID || "";
+    // console.log(thumbnails);
+    const id = thumbnails.find((t) => t.size === 'small')?.fileID
+      || thumbnails.find((t) => t.size === 'tiny')?.fileID || "";
 
-  if (id.length > 0) {
-    return `/api/thumbnails/${id}`;
+    if (id.length > 0) {
+      return `/api/thumbnails/${id}`;
+    }
+    return thumbnails.find((t) => t.size === 'medium')?.url
+      || thumbnails.find((t) => t.size === 'small')?.url
+      || thumbnails.find((t) => t.size === 'tiny')?.url 
+      || "";
   }
-  return thumbnails.find((t) => t.size === 'medium')?.url
-    || thumbnails.find((t) => t.size === 'small')?.url
-    || thumbnails.find((t) => t.size === 'tiny')?.url 
-    || "";
-}
+
+  function selectAuthor(authorID: string): void {
+
+  }
 </script>
 
 {#if videos?.length > 0}
@@ -31,7 +35,9 @@
       <Card img="{getBestThumbnail(video.thumbnails)}">
         <div class="flex">
           <div class="flex-none w-14">
-            <Avatar src="{getBestThumbnail(authors[video.authorID].thumbnails)}" />
+            <a href="#/search?authorID={video.authorID}">
+              <Avatar src="{getBestThumbnail(authors[video.authorID].thumbnails)}" />
+            </a>
           </div>
           <div class="flex-auto w-64">
             <h5 class="mb-1 text-sm font-bold tracking-tight text-gray-900 dark:text-white">

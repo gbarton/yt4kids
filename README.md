@@ -23,7 +23,7 @@ Now its a fun project to rethink content delivery in such a way that would be sa
   * &#x2610; Ability to mark channels for checking for new videos
 * &#x2610; logins/users for basic access control
 * &#x2610; Search local videos
-* &#x1F5F9; Play a video streamed in chunks from the backend
+* &#x1F5F9; Play a video streamed in chunks from the backend (unless its edge/chrome, they suck and download the whole thing before playing!)
 
 ## Configuration
 The following environment variables are usable either as a `.env` file or passed in.
@@ -40,6 +40,11 @@ YK_DB_STORAGE_DIR=./storage/db
 # loki specific settings
 # disk/memory
 YK_LOKI_ADAPTER=disk
+
+# Download interval (default 5m)
+# How often we try to download a video
+# too fast and you could get IP banned!
+YT_DOWNLOAD_INTERVAL=300000
 ```
 
 ## Development
