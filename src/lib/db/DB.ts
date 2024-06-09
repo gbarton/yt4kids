@@ -16,10 +16,11 @@ export default async function getDB(): Promise<IDB> {
   return Promise.resolve(builtDb);
 }
 
-export async function addQueue(videoID: string, authorID: string): Promise<YTQueue> {
+export async function addQueue(videoID: string, authorID: string, title: string): Promise<YTQueue> {
   const DB = await getDB();
   const q : YTQueue = {
     authorID,
+    title,
     complete: false,
     requestedDate: new Date(),
     id: videoID,

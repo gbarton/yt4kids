@@ -75,10 +75,10 @@ app.get('/api/yt/video/:authorID/:videoID', async (req, res) => {
 
 app.post('/api/yt/video/queue', async (req, res) => {
   log.info(req?.body, 'queue yt video post called');
-  if (!req?.body || !req.body.authorID || !req.body.videoID) {
-    return res.status(400).send('missing body params {videoID, authorID}')
+  if (!req?.body || !req.body.authorID || !req.body.videoID || !req.body.title) {
+    return res.status(400).send('missing body params {videoID, authorID, title}')
   }
-  const resp = await addQueue(req.body.videoID, req.body.authorID);
+  const resp = await addQueue(req.body.videoID, req.body.authorID, req.body.title);
   return res.send(resp);
 });
 
@@ -96,7 +96,11 @@ app.post('/api/yt/video', async (req, res) => {
 
 app.get('/api/queue', async (req, res) => {
   const DB = await getDB();
-  const queue = await DB.find<YTQueue>(RecordTypes.DL_QUEUE, { limit: 1000 })
+  const queue = await DB.find<YTQueue>(RecordTypes.DL_QUEUE,
+    { limit: 1000,
+      sortBy: "requestedDate",
+      sortByDescending: true,
+     })
     .catch((err) => {
       log.warn("issues getting the queues");
       log.error(err);

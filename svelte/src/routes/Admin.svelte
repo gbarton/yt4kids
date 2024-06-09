@@ -60,7 +60,7 @@
     console.log("add a video", videoID, authorID);
     const resp = await fetch('/api/yt/video/queue', {
       method: 'POST',
-      body: JSON.stringify({videoID, authorID}),
+      body: JSON.stringify({videoID, authorID, title}),
       headers: {
 				'content-type': 'application/json',
 			},
@@ -159,7 +159,7 @@
       ...Loading Queue
       {:then que}
         {#each que as q}
-          <p>{q.id} {q.complete ? "done" : ""}</p>
+          <p class="text-sm">{q.title} {q.complete ? "done" : ""}</p>
         {/each}
       {/await}
 
