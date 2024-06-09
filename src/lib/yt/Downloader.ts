@@ -555,6 +555,7 @@ function addAuthorToList(a: Author, authors: {[key: string]: YTAuthor}) {
 export async function search(query: string, opts : SearchOptions): Promise<YTSearchResponse> {
   log.info({query, opts}, "YT Search");
   const results = await (await getYT()).search(query, opts);
+  const DB = await getDB();
 
   // parse results
   const sr : YTSearchResponse = {
@@ -601,6 +602,20 @@ export async function search(query: string, opts : SearchOptions): Promise<YTSea
       addAuthorToList(c.author, sr.authors);
     }
   }
+
+  // add fileID's for all the videos
+  const lookups = sr.videos.map((v) => {
+    return new Promise(async (resolve) => {
+      const file = await DB.findOne<YTFile>(RecordTypes.VIDEO_FILE, v.id)
+        .catch(() => resolve(true));
+      if (file) {
+        v.fileID = file.id;
+      }
+      resolve(true);
+    });
+  });
+
+  await Promise.all(lookups);
 
   return sr;
 }
