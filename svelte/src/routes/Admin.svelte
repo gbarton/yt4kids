@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { Select, Search, Button, Card } from 'flowbite-svelte';
-  import { ArrowRightOutline, DownloadOutline, SearchOutline } from 'flowbite-svelte-icons';
+  import { Select, Search, Button, Card, Toast} from 'flowbite-svelte';
+
+  import { ArrowRightOutline, DownloadOutline, FolderPlusOutline, SearchOutline } from 'flowbite-svelte-icons';
   
-	import type { YTSearchResponse, YTThumbnail } from '../lib/Types';
+	import type { YTQueue, YTSearchResponse, YTThumbnail } from '../lib/Types';
 
   import {VideoCards} from '../lib/components';
 	
@@ -27,6 +28,8 @@
     }
   ]
 
+  let messages : string[] = [];
+
   let selectCategory = 'all'
   let searchString = '';
 
@@ -37,7 +40,23 @@
       || "";
   }
 
-  async function queueVideo(videoID: string, authorID: string) {
+  let queue = getQueue();
+
+  async function getQueue() : Promise<YTQueue[]> {
+    const resp = await fetch('/api/queue');
+    if (!resp.ok) {
+      return [];
+    }
+
+    const data = await resp.json();
+    return data as YTQueue[];
+  }
+
+  // onMount(async () => {
+  //   queues = getQueue();
+  // });
+
+  async function queueVideo(videoID: string, authorID: string, title: string) {
     console.log("add a video", videoID, authorID);
     const resp = await fetch('/api/yt/video/queue', {
       method: 'POST',
@@ -50,7 +69,16 @@
     const data = await resp.json();
     if (data.error) {
       // mark it broke?
+      return;
     }
+    const message = `Video queued ${title.substring(0, 20)}...`;
+    messages.push(message);
+    setTimeout(() => {
+      const pos = messages.indexOf(message);
+      if (pos > -1) {
+        messages = messages.splice(pos, 1);
+      }
+    }, 5000);
     console.log('queue response', data);
   }  
 
@@ -103,8 +131,10 @@
 </script>
 
 
+<h1>admin area</h1>
+
+
 <div class="container">
-  <h1>admin area</h1>
 
   <form class="flex" on:submit|preventDefault={handleSubmit}>
     <div class="relative">
@@ -116,44 +146,66 @@
     </Button>
   </form>
 
-</div>
+  <div class="flex">
+    <div class="flex-none w-1/4">
+      <h5 class="mb-2 font-bold">Queue</h5>
+      {#if messages.length > 0}
+        {#each messages as msg}
+          <Toast>{msg}</Toast>
+        {/each}
+      {/if}
 
-{#if data?.channels?.length > 0}
-<div class="container">
-  <h4 class="text-2xl mb-2 font-bold">Channels</h4>
-  <!-- <div class="grid grid-flow-col auto-cols-max"> -->
-  <div class="grid grid-cols-3 gap-4">
-    {#each data.channels as channel }
-    <div>
-      <Card img="{getBestThumbnail(data.authors[channel.authorID].thumbnails)}" horizontal size="lg">
-        <h5 class="mb-2 text-lg font-bold tracking-tight text-gray-900 dark:text-white">
-          {channel.name}
-        </h5>
-        <p class="mb-3 font-normal text-gray-700 dark:text-gray-400 leading-tight">
-          {data.authors[channel.authorID].name}
-        </p>
-        <Button size="xs" class="w-fit" color="light">
-          Follow <DownloadOutline class="w-4 h-4 ms-2 text-black" />
-        </Button>
+      {#await queue}
+      ...Loading Queue
+      {:then que}
+        {#each que as q}
+          <p>{q.id} {q.complete ? "done" : ""}</p>
+        {/each}
+      {/await}
 
-      </Card>
     </div>
-    {/each}
+    <div class="grow">
+      {#if data?.channels?.length > 0}
+      <div class="container">
+        <h4 class="text-2xl mb-2 font-bold">Channels</h4>
+        <!-- <div class="grid grid-flow-col auto-cols-max"> -->
+        <div class="grid grid-cols-3 gap-4">
+          {#each data.channels as channel }
+          <div>
+            <Card img="{getBestThumbnail(data.authors[channel.authorID].thumbnails)}" horizontal size="lg">
+              <h5 class="mb-2 text-lg font-bold tracking-tight text-gray-900 dark:text-white">
+                {channel.name}
+              </h5>
+              <p class="mb-3 font-normal text-gray-700 dark:text-gray-400 leading-tight">
+                {data.authors[channel.authorID].name}
+              </p>
+              <Button size="xs" class="w-fit" color="light">
+                Follow <DownloadOutline class="w-4 h-4 ms-2 text-black" />
+              </Button>
+      
+            </Card>
+          </div>
+          {/each}
+        </div>
+      </div>
+      {/if}
+      
+      {#if data?.videos?.length > 0}
+      <VideoCards {...data}>
+        <svelte:fragment slot="buttons" let:video>
+          <Button size="xs" class="w-fit" color="light" disabled={video.fileID !== undefined}
+            on:click="{() => queueVideo(video.id, video.authorID, video.title)}">
+            Queue <ArrowRightOutline class="w-6 h-6 ms-2 text-black" />
+          </Button>
+          <Button size="xs" class="w-fit" color="light" disabled={video.fileID !== undefined}
+            on:click="{() => addVideo(video.id, video.authorID)}">
+            Add <DownloadOutline class="w-6 h-6 ms-2 text-black" />
+          </Button>
+        </svelte:fragment>
+      </VideoCards>
+      {/if}
+    </div>
   </div>
-</div>
-{/if}
 
-{#if data?.videos?.length > 0}
-<VideoCards {...data}>
-  <svelte:fragment slot="buttons" let:video>
-    <Button size="xs" class="w-fit" color="light" disabled={video.fileID !== undefined}
-      on:click="{() => queueVideo(video.id, video.authorID)}">
-      Queue <ArrowRightOutline class="w-6 h-6 ms-2 text-black" />
-    </Button>
-    <Button size="xs" class="w-fit" color="light" disabled={video.fileID !== undefined}
-      on:click="{() => addVideo(video.id, video.authorID)}">
-      Add <DownloadOutline class="w-6 h-6 ms-2 text-black" />
-    </Button>
-  </svelte:fragment>
-</VideoCards>
-{/if}
+</div>
+

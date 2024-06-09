@@ -13,6 +13,12 @@ export interface YTRecord {
   recordType: RecordTypes,
 }
 
+export interface YTQueue extends YTRecord {
+  authorID: string,
+  complete: boolean,
+  requestedDate: Date,
+}
+
 export type YTThumbnail = {
   // id is the cleaned postfix of the src url
   id: string,
