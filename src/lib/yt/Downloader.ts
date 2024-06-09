@@ -7,7 +7,7 @@ import { Innertube, Utils as YTTools } from 'youtubei.js';
 import * as Utils from '../utils/Utils';
 import getDB from "../db/DB";
 
-import { RecordTypes, SearchOptions, YTAuthor, YTChannelInfo, YTFile, YTSearchResponse, YTThumbnail, YTVideoInfo } from "../db/Types";
+import { RecordTypes, SearchOptions, YTAuthor, YTChannelInfo, YTFile, YTQueue, YTSearchResponse, YTThumbnail, YTVideoInfo } from "../db/Types";
 
 import crypto from 'crypto';
 import cp from 'child_process';
@@ -603,13 +603,18 @@ export async function search(query: string, opts : SearchOptions): Promise<YTSea
     }
   }
 
-  // add fileID's for all the videos
+  // add fileID's for all the videos we have, add fake ones for queued ones
   const lookups = sr.videos.map((v) => {
     return new Promise(async (resolve) => {
       const file = await DB.findOne<YTFile>(RecordTypes.VIDEO_FILE, v.id)
         .catch(() => resolve(true));
       if (file) {
         v.fileID = file.id;
+      } else {
+        const queue = await DB.findOne<YTQueue>(RecordTypes.DL_QUEUE, v.id);
+        if (queue) {
+          v.fileID = "In Queue";
+        }
       }
       resolve(true);
     });

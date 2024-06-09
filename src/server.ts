@@ -24,7 +24,7 @@ import getDB, { getVideos, addQueue } from "./lib/db/DB";
 import * as YT from './lib/yt/Downloader';
 import { existsSync, createReadStream, ReadStream } from 'fs';
 import ContentDisposition from 'content-disposition';
-import { MediaTypes, RecordTypes, SearchOptions, UploadDate, YTFile, YTThumbnail, YTVideoInfo } from "./lib/db/Types";
+import { MediaTypes, RecordTypes, SearchOptions, UploadDate, YTFile, YTQueue, YTThumbnail, YTVideoInfo } from "./lib/db/Types";
 
 import Manager from './lib/queue/Manager';
 Manager.getInstance();
@@ -92,6 +92,17 @@ app.post('/api/yt/video', async (req, res) => {
     return res.status(500).send(response.error);
   }
   return res.send(response);
+});
+
+app.get('/api/queue', async (req, res) => {
+  const DB = await getDB();
+  const queue = await DB.find<YTQueue>(RecordTypes.DL_QUEUE, { limit: 1000 })
+    .catch((err) => {
+      log.warn("issues getting the queues");
+      log.error(err);
+      return res.send([]);
+    });
+  return res.send(queue);
 });
 
 // get all videos
