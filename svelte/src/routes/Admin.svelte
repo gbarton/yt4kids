@@ -4,11 +4,11 @@
   import { ArrowRightOutline, DownloadOutline, FolderPlusOutline, SearchOutline } from 'flowbite-svelte-icons';
   
 	import type { YTQueue, YTSearchResponse, YTThumbnail } from '../lib/Types';
+  import type { Action } from 'svelte/action';
 
   import {VideoCards} from '../lib/components';
 	
-	export let data: YTSearchResponse;
-
+  
   const categories = [
     {
       name: 'All categories',
@@ -27,10 +27,20 @@
       value: 'playlist',
     }
   ]
-
+  
+  // data we are pulling
+  export let data: YTSearchResponse = {
+    query: "",
+    videos: [],
+    channels: [],
+    authors: {},
+  };
+  // is a search going on right now
+  let searching : boolean = false;
   let messages : string[] = [];
 
   let selectCategory = 'all'
+  let prevSearchString = '-1';
   let searchString = '';
 
   function getBestThumbnail(thumbnails: YTThumbnail[]): string {
@@ -80,6 +90,7 @@
       }
     }, 5000);
     console.log('queue response', data);
+    queue = getQueue();
   }  
 
   async function addVideo(videoID: string, authorID: string) {
@@ -99,10 +110,52 @@
     console.log('dl response', data);
   }
 
+  let pageNumber = 1;
+
+  function loadMore(node: Element) {
+    const obs = new IntersectionObserver((entries) => {
+      // I think this only fires once because we are just tied to the window
+      entries.forEach((entry) => {
+        console.log('here');
+        console.log(entry);
+        if (entry.isIntersecting) {
+          console.log('intersection detected');
+          handleSubmit();
+        }
+      });
+    },
+    {
+      // threshold: 0.1 , // 10%
+    });
+
+    obs.observe(node);
+    return {
+      destroy: () => {
+        console.log('destroyed obervable')
+        obs.disconnect();
+      }
+    }
+  }
+
+  // called to pull data
   async function handleSubmit() {
     console.log(`submit called ${searchString} - ${selectCategory}`);
+    if (searching) {
+      console.log('already searching');
+      return;
+    }
 
-    const params: string[][] = [];
+    searching = true;
+
+    // new search, reset
+    if (searchString !== prevSearchString) {
+      pageNumber == 0;
+      prevSearchString = searchString;
+    } else {
+      pageNumber += 1;
+    }
+
+    const params: string[][] = [['page', `${pageNumber}`]];
     if (searchString) {
       params.push(['query', searchString.toString()]);
     }
@@ -123,9 +176,30 @@
       return;
     }
 
-    const items = await res.json();
-    console.log(items);
-    data = items as YTSearchResponse;
+    const json = await res.json();
+    console.log(json);
+    // reset
+    if (pageNumber == 0) {
+      data = {
+        query: "",
+        videos: [],
+        channels: [],
+        authors: {},
+      };
+    }
+
+    // add new data
+    const sr = json as YTSearchResponse;
+    data.videos = [...data.videos, ...sr.videos];
+    data.channels = [...data.channels, ...sr.channels];
+    console.log(sr.authors);
+    for (let k in sr.authors) {
+      console.log(`k: ${k}`);
+      if (!data.authors[k]) {
+        data.authors[k] = sr.authors[k];
+      }
+    }
+    searching = false;
   }
 
 </script>
@@ -203,6 +277,9 @@
           </Button>
         </svelte:fragment>
       </VideoCards>
+      <div use:loadMore>
+        ...loading more
+      </div>
       {/if}
     </div>
   </div>

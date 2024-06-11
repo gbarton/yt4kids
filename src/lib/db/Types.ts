@@ -19,7 +19,8 @@ export enum UploadDate {
 
 export type SearchOptions = {
   type?: MediaTypes,
-  upload_date?: UploadDate
+  upload_date?: UploadDate,
+  page: number,
 }
 
 // INTERNAL

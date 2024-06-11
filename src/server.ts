@@ -52,11 +52,11 @@ const isMediaType = Util.inStringEnum(MediaTypes);
 const isUploadType = Util.inStringEnum(UploadDate);
 
 app.get('/api/yt/search', async (req, res) => {
-  const {query, type, upload_date } = req?.query;
+  const {query, type, upload_date, page } = req?.query;
   if (!query) {
     return res.status(400).send('no query provided');
   }
-  const opts : SearchOptions = {}
+  const opts : SearchOptions = { page: page ? +page : 1 }
   if (type && isMediaType(type.toString())) {
     opts.type = type.toString() as MediaTypes;
   }

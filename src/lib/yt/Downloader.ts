@@ -554,7 +554,16 @@ function addAuthorToList(a: Author, authors: {[key: string]: YTAuthor}) {
 
 export async function search(query: string, opts : SearchOptions): Promise<YTSearchResponse> {
   log.info({query, opts}, "YT Search");
-  const results = await (await getYT()).search(query, opts);
+  let results = await (await getYT()).search(query, opts);
+
+  if (opts.page > 1) {
+    for (let p = 2; p <= opts.page; p += 1) {
+      log.info(`getting page: ${opts.page}`);
+      results = await results.getContinuation();
+    }
+  }
+
+
   const DB = await getDB();
 
   // parse results

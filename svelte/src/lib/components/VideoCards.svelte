@@ -30,7 +30,7 @@
   <h4 class="text-2xl mb-2 font-bold">Videos</h4>
   <!-- <div class="grid grid-flow-col auto-cols-max"> -->
   <div class="grid grid-cols-3 gap-4">
-    {#each videos as video }
+    {#each videos as video}
     <div>
       <Card img="{getBestThumbnail(video.thumbnails)}">
         <div class="flex">
