@@ -144,7 +144,7 @@ export default class LokiDatabase implements IDB {
    */
   async fetch(type: RecordTypes, options: QueryOptions): Promise<Resultset<any>> {
     if (Utils.isNull(options) || Object.keys(options).length === 0) {
-      log.info(options, `missing options for find`);
+      log.warn(options, `missing options for find`);
       throw new Error(`find query for type ${type} has no options`);
     }
 
@@ -159,6 +159,20 @@ export default class LokiDatabase implements IDB {
     let results = coll.chain();
     if (opts?.clause !== undefined) {
       results = results.find(opts.clause);
+    }
+    // we treat it as a bunch of and keywords
+    if(opts?.keywords !== undefined) {
+      // for each column
+      for(let i = 0; i < opts.keywords.length; i += 1) {
+        const term = opts.keywords[i];
+        // for each term
+        for (let v = 0; v < term.values.length; v += 1) {
+          const obj : {[key: string] : {}}= {}
+          // silly syntax but this makes it a case insensitive keyword search
+          obj[term.col] = {'$regex' : [term.values[v], 'i']};
+          results = results.find(obj);
+        }
+      }
     }
     if (opts?.sortBy !== undefined) {
       results = results.simplesort(opts.sortBy, opts.sortByDescending);

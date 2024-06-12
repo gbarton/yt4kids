@@ -44,6 +44,15 @@ export interface YTRecord {
   recordType: RecordTypes,
 }
 
+/**
+ * dunno how I feel about this one
+ */
+export interface YTSearch {
+  authorID?: string,
+  search?: string,
+  channelID?: string,
+}
+
 export interface YTQueue extends YTRecord {
   authorID: string,
   title: string,
@@ -122,6 +131,8 @@ export interface YTSearchResponse {
 
 export type QueryOptions = {
   clause?: Object,
+  // does a keyword search for all values against the column
+  keywords?: [{col: string, values: string[]}],
   sortBy?: string,
   sortByDescending?: boolean,
   sortFunction?: (o1: object, o2: object) => number

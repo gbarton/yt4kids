@@ -24,7 +24,7 @@
   </div>
 
   <NavUl>
-    <NavLi href="#/">Home</NavLi>
+    <NavLi href="/">Home</NavLi>
     <NavLi href="#/about">About</NavLi>
     <!-- <NavLi href="#/admin">Admin</NavLi> -->
   </NavUl>

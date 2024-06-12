@@ -24,7 +24,7 @@ import getDB, { getVideos, addQueue } from "./lib/db/DB";
 import * as YT from './lib/yt/Downloader';
 import { existsSync, createReadStream, ReadStream } from 'fs';
 import ContentDisposition from 'content-disposition';
-import { MediaTypes, RecordTypes, SearchOptions, UploadDate, YTFile, YTQueue, YTThumbnail, YTVideoInfo } from "./lib/db/Types";
+import { MediaTypes, RecordTypes, SearchOptions, UploadDate, YTFile, YTQueue, YTSearch, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./lib/db/Types";
 
 import Manager from './lib/queue/Manager';
 Manager.getInstance();
@@ -109,21 +109,45 @@ app.get('/api/queue', async (req, res) => {
   return res.send(queue);
 });
 
+function combineSearchResults(results: YTSearchResponse, add: YTSearchResponse) : YTSearchResponse {
+  const com = {
+    query: results.query,
+    videos: [...results.videos, ...add.videos],
+    channels: [...results.channels, ...add.channels],
+    authors: results.authors,
+  }
+  
+  for (let k in add.authors) {
+    if (!com.authors[k]) {
+      com.authors[k] = add.authors[k];
+    }
+  }
+
+  return com;
+}
+
 // get all videos
 // TODO: filters!
 app.get('/api/search', async (req, res) => {
   log.info('local search called');
-  let searchOpts = {
+  log.info(req.query);
+  let searchOpts: YTSearch = {
     search: "",
     authorID: undefined,
-    type: "",
+    channelID: undefined,
   }
   searchOpts = {...searchOpts, ...req.query};
-  if (searchOpts.type !== "" && isMediaType(searchOpts.type)) {
-    searchOpts.type = searchOpts.type.toString() as MediaTypes;
+
+  let results : YTSearchResponse = {
+    query: "",
+    channels: [],
+    videos: [],
+    authors: {}
   }
+
   log.info(searchOpts, 'searchOpts');
-  const results = await getVideos(searchOpts?.authorID);
+  const videoResults = await getVideos(searchOpts);
+  results = combineSearchResults(results, videoResults);
   res.send(results);
 });
 

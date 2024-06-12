@@ -14,17 +14,25 @@
     value: string,
   }
 
-  export let options : KV[] = [];
+  let options : KV[] = [];
 
-  export let data : YTSearchResponse;
+  let data : YTSearchResponse;
   console.log("home page log");
 
   onMount(async () => {
-    console.log('homepage server url params');  
-    const searchParams = new URLSearchParams($querystring);
+    console.log('homepage server url params');
+    console.log($querystring);
+    console.log($querystring === "");
+    let queryStr = $querystring;
+    if (queryStr === "") {
+      queryStr = window.location.search;
+      console.log("using window params: " + queryStr);
+    }
+    const searchParams = new URLSearchParams(queryStr);
     console.log(searchParams.toString());
     let searchString = '';
     if (searchParams.size > 0) {
+      console.log('enough params to send');
       searchString += '?' + searchParams;
       options = [];
       searchParams.forEach((val, k) => {

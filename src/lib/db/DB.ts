@@ -1,7 +1,11 @@
-import { IDB, QueryOptions, RecordTypes, YTAuthor, YTQueue, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./Types";
+import { IDB, QueryOptions, RecordTypes, YTAuthor, YTQueue, YTSearch, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./Types";
 import LokiDatabase from "./LokiDB";
+import log from '../log/Logger'
 
 let builtDb: IDB;
+
+// TODO: this DB abstraction was a good idea but still
+// TODO: leaks lokidb query structure :(
 
 export default async function getDB(): Promise<IDB> {
   if(builtDb !== undefined) {
@@ -41,7 +45,7 @@ export async function getQueue(limit: number = 1): Promise<YTQueue[]> {
   return results;
 }
 
-export async function getVideos(authorID?: string): Promise<YTSearchResponse> {
+export async function getVideos(searchOpts: YTSearch): Promise<YTSearchResponse> {
   const DB = await getDB();
 
   const qo: QueryOptions = {
@@ -51,11 +55,16 @@ export async function getVideos(authorID?: string): Promise<YTSearchResponse> {
     }
   }
 
-  if(authorID) {
-    qo.clause = { authorID };
+  if(searchOpts.authorID) {
+    qo.clause = { authorID: searchOpts.authorID };
+  }
+
+  if(searchOpts.search) {
+    qo.keywords = [{col: "title", values: searchOpts.search.split(" ")}]
   }
 
   const results = await DB.find<YTVideoInfo>(RecordTypes.VIDEO, qo);
+  log.info(`video search found ${results.length} videos`);
 
   const authors: {[key: string]: YTAuthor} = {};
   // resolve all the authors (unique the id's first)
