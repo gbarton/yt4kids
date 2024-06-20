@@ -1,3 +1,5 @@
+import log from '../log/Logger';
+
 /**
  * null test
  * @param {*} val any object
@@ -37,4 +39,33 @@ export function inStringEnum<E extends string>(strEnum: Record<string, E>) {
   const enumValues = Object.values(strEnum) as string[];
 
   return (value: string) : value is E => enumValues.includes(value);
+}
+
+/**
+ * while not a true cancellation as the async op will continue to run
+ * this will allow an early break out on our code to go do something else
+ * @param fn function() to execute
+ * @param timeMS (default 10s) how long to wait for
+ * @returns whatever is typed on the function
+ */
+export async function cancellable<T>(fn: () => Promise<T>, timeMS: number = 10000): Promise<T> {
+  let timer: NodeJS.Timeout;
+  let cancelled = false;
+  const p = new Promise<T>(async (resolve, reject) => {
+    timer = setTimeout(() => cancelled = true, timeMS);
+    const res : T = await fn();
+    if (!cancelled) {
+      return resolve(res);
+    }
+    return reject(new Error("TIMEOUT EXCEEDED"));
+  }).finally(() => {
+    clearTimeout(timer);
+    if (cancelled) {
+      log.warn("cancellable was cancelled");
+    } else {
+      log.info("cancellable completed");
+    }
+  });
+
+  return p;
 }

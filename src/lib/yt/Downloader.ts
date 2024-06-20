@@ -17,6 +17,7 @@ import { VideoInfo } from "youtubei.js/dist/src/parser/youtube";
 import { Author, Format, Thumbnail } from "youtubei.js/dist/src/parser/misc";
 import { Video } from "youtubei.js/dist/src/parser/nodes";
 import { Readable } from "stream";
+import { ReadableStream } from "stream/web";
 
 log.info(ffmpegPath, "FFMPEG path");
 
@@ -123,6 +124,23 @@ type DLExtraOpts = {
 
 type DLOpts = DownloadOptions & DLExtraOpts;
 
+// async function cancellable<T>(fn: () => Promise<T>, timeMS: number = 10000): Promise<T> {
+//   let timer: NodeJS.Timeout;
+//   const p = new Promise<T>(async (resolve, reject) => {
+//     let cancelled = false;
+//     timer = setTimeout(() => cancelled = true, timeMS);
+//     const res : T = await fn();
+//     if (!cancelled) {
+//       return resolve(res);
+//     }
+//     return reject();
+//   }).finally(() => {
+//     clearTimeout(timer);
+//   });
+
+//   return p;
+// }
+
 /**
  * Downloads a given yt video with the authorID
  * (cause the yt call doesnt seem to have author data!?)
@@ -133,37 +151,60 @@ type DLOpts = DownloadOptions & DLExtraOpts;
 async function download(id: string, dlObj: DLOpts, path: string) {
   log.info(dlObj, "Download Options");
   const yt = await getYT();
-  const stream = await yt.download(id, dlObj);
+ 
+  const stream = await Utils.cancellable<ReadableStream<Uint8Array>>(() => yt.download(id, dlObj), 5000);
+  // let timer : NodeJS.Timeout;
+  // const p = new Promise<ReadableStream>(async (resolve, reject) => {
+  //   let cancelled = false;
+  //   // wait 10s for
+  //   timer = setTimeout(() => cancelled = true, 10000);
+  //   const stream = await yt.download(id, dlObj);
+  //   if (!cancelled) {
+  //     return resolve(stream);
+  //   }
+  //   return reject();
+    
+  // }).finally(() => {
+  //   clearTimeout(timer);
+  // });
+
+  // const stream = await p;
+  // const stream = await yt.download(id, dlObj);
 
   const file = createWriteStream(path);
   let chunks = 0;
   let percent = 0;
   const total = dlObj.contentLength;
 
-  // need to wait on the write to ensure the file is completely ready
-  for await (const chunk of YTTools.streamToIterable(stream)) {
-    const p = new Promise((resolve, reject) => {
-      file.write(chunk, (err) => {
-        if (err) {
-          return reject(err);
+  const bytesOnDisk = await Utils.cancellable<number>(async (): Promise<number> => {
+      // need to wait on the write to ensure the file is completely ready
+      for await (const chunk of YTTools.streamToIterable(stream)) {
+        const p = new Promise((resolve, reject) => {
+          file.write(chunk, (err) => {
+            if (err) {
+              return reject(err);
+            }
+            return resolve(path);
+          });
+        });
+        await p;
+        chunks += chunk.length;
+        if (Math.round(chunks / total * 100) >= percent + 10.0) {
+          percent = Math.round(chunks / total * 100);
+          log.info(`${percent}% (${chunks}/${total})`);
         }
-        return resolve(path);
-      });
-    });
-    await p;
-    chunks += chunk.length;
-    if (Math.round(chunks / total * 100) >= percent + 10.0) {
+      }
+      
       percent = Math.round(chunks / total * 100);
-      log.info(`${percent}% (${chunks}/${total})`);
-    }
-  }
-  
-  percent = Math.round(chunks / total * 100);
-  log.info(`${percent}% ${path} chunks written ${chunks}/${total}`);
-  file.end();
-  // file.close();
+      log.info(`${percent}% ${path} chunks written ${chunks}/${total}`);
+      file.end();
+      // file.close();
+      return getFilesizeInBytes(path);
 
-  log.info(`bytes on disk: ${getFilesizeInBytes(path)}/${total}`)
+  }, 1000 * 60 * 10); // 10m timeout
+  log.info(`bytes on disk: ${bytesOnDisk}/${total}`)
+
+  // log.info(`bytes on disk: ${getFilesizeInBytes(path)}/${total}`)
 }
 
 /**
