@@ -267,10 +267,18 @@
       {#if data?.videos?.length > 0}
       <VideoCards {...data}>
         <svelte:fragment slot="buttons" let:video>
-          <Button size="xs" class="w-fit" color="light" disabled={video.fileID !== undefined}
+          {#if video.fileID === undefined}
+          <Button size="xs" class="w-fit" color="light"
             on:click="{() => queueVideo(video.id, video.authorID, video.title)}">
             Queue <ArrowRightOutline class="w-6 h-6 ms-2 text-black" />
           </Button>
+          {/if}
+          {#if video.fileID !== undefined}
+          <Button size="xs" class="w-fit" color="light"
+            on:click="{() => addVideo(video.id, video.authorID)}">
+            re-download <ArrowRightOutline class="w-6 h-6 ms-2 text-black" />
+          </Button>
+          {/if}
           <Button size="xs" class="w-fit" color="light" disabled={video.fileID !== undefined}
             on:click="{() => addVideo(video.id, video.authorID)}">
             Add <DownloadOutline class="w-6 h-6 ms-2 text-black" />
