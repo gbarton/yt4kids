@@ -16,7 +16,7 @@ import bodyParser from 'body-parser';
 import log from './lib/log/Logger'
 
 import * as Util from './lib/utils/Utils';
-import getDB, { getVideos, addQueue } from "./lib/db/DB";
+import getDB, { getVideos, addQueue, getUser } from "./lib/db/DB";
 
 // import Logger from 'pino-http'
 // const httpLog = Logger({ logger: log })
@@ -24,7 +24,10 @@ import getDB, { getVideos, addQueue } from "./lib/db/DB";
 import * as YT from './lib/yt/Downloader';
 import { existsSync, createReadStream, ReadStream } from 'fs';
 import ContentDisposition from 'content-disposition';
-import { MediaTypes, RecordTypes, SearchOptions, UploadDate, YTFile, YTQueue, YTSearch, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./lib/db/Types";
+import { MediaTypes, RecordTypes, SearchOptions, UploadDate, YTFile, YTProfile, YTQueue, YTSearch, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./lib/db/Types";
+
+import bcrypt from 'bcrypt'
+import jsonwebtoken from 'jsonwebtoken';
 
 import Manager from './lib/queue/Manager';
 Manager.getInstance();
@@ -48,9 +51,88 @@ app.get('/api/hello', (req, res) => {
   res.send('api server hello!');
 });
 
+// USER management
+
+const ACCESS_SECRET = process.env.YT_ACCESS_SECRET || "NO";
+const REFRESH_SECRET = process.env.YT_REFRESH_SECRET || "NO";
+
+if (ACCESS_SECRET === "NO" || REFRESH_SECRET == "NO") {
+  log.error("jwt secrets not set, please set some!");
+  process.exit(1);
+}
+
+app.post('/api/login', async (req, res) => {
+  const { password, email } = req?.body;
+  if ((password === undefined || password === null) || 
+    (email === undefined || email === null)) {
+      return res.status(400).send("missing creds");
+  }
+  const user = await getUser(email);
+  // TODO: debounce?
+  if (!user) {
+    return res.status(400).send("user not found");
+  }
+  if (!bcrypt.compare(password, user.pwHash)) {
+    return res.status(400).send("auth failed");
+  }
+  // all good, generate a JWT token
+  const payload = {
+    email: user.email,
+    displayName : user.displayName,
+    admin : user.admin,
+  }
+  // TODO: add expires env props
+  const accessToken = jsonwebtoken.sign(payload, ACCESS_SECRET, { expiresIn: "7d" });
+  const refreshToken = jsonwebtoken.sign(payload, REFRESH_SECRET, {expiresIn: "10d" });
+  log.info(`logged in user ${user.email}`);
+  return res.send({
+    accessToken,
+    refreshToken,
+    user: payload,
+  });
+});
+
+// src: https://medium.com/@prashantramnyc/authenticate-rest-apis-in-node-js-using-jwt-json-web-tokens-f0e97669aad3
+// list users
+app.get('/api/user', async (req, res) => {
+  const DB = await getDB();
+  const users = await DB.find<YTProfile>(RecordTypes.USER_PROFILE, {});
+  // filter out password hash
+  return res.send(users.map(({email, displayName, admin}) => ({ email, displayName, admin })));
+});
+
+// create new user
+app.post('/api/user', async (req, res) => {
+  log.info('new user request');
+  const { displayName, password, email, admin } = req?.body;
+  if ((displayName === undefined || displayName === null) ||
+    (password === undefined || password === null) || 
+    (email === undefined || email === null)) {
+    return res.status(400).send("missing user information");
+  }
+  // TODO: validate email
+  const DB = await getDB();
+  const users = await DB.find<YTProfile>(RecordTypes.USER_PROFILE, { limit: 1 });
+  let userRecord = await getUser(email);
+  if (userRecord !== null) {
+    return res.status(400).send("User already exists");
+  }
+  userRecord = {
+    id: email,
+    recordType: RecordTypes.USER_PROFILE,
+    email,
+    displayName,
+    admin: admin || users.length == 0,
+    pwHash: await bcrypt.hash(password, 10)
+  }
+  await DB.insertOrUpdateObj(userRecord);
+  return res.send("ok");
+});
+
 const isMediaType = Util.inStringEnum(MediaTypes);
 const isUploadType = Util.inStringEnum(UploadDate);
 
+// search youtube for videos
 app.get('/api/yt/search', async (req, res) => {
   const {query, type, upload_date, page } = req?.query;
   if (!query) {
@@ -68,11 +150,13 @@ app.get('/api/yt/search', async (req, res) => {
   return res.send(results);
 });
 
+// OBE (was for testing) download a video right now
 app.get('/api/yt/video/:authorID/:videoID', async (req, res) => {
   await YT.downloadYTVideo(req.params.videoID, req.params.authorID);
   res.send(req.params.videoID);
 });
 
+// queue up video for downloading later
 app.post('/api/yt/video/queue', async (req, res) => {
   log.info(req?.body, 'queue yt video post called');
   if (!req?.body || !req.body.authorID || !req.body.videoID || !req.body.title) {
@@ -82,6 +166,7 @@ app.post('/api/yt/video/queue', async (req, res) => {
   return res.send(resp);
 });
 
+// download video right now
 app.post('/api/yt/video', async (req, res) => {
   log.info(req?.body, 'download yt video post called');
   if (!req?.body || !req.body.authorID || !req.body.videoID) {
@@ -94,6 +179,7 @@ app.post('/api/yt/video', async (req, res) => {
   return res.send(response);
 });
 
+// get dl queue
 app.get('/api/queue', async (req, res) => {
   const DB = await getDB();
   const queue = await DB.find<YTQueue>(RecordTypes.DL_QUEUE,
@@ -126,8 +212,7 @@ function combineSearchResults(results: YTSearchResponse, add: YTSearchResponse) 
   return com;
 }
 
-// get all videos
-// TODO: filters!
+// simple local search for content
 app.get('/api/search', async (req, res) => {
   log.info('local search called');
   log.info(req.query);
@@ -158,6 +243,7 @@ type Head = {
   [key: string]: string | number,
 }
 
+// retrieve local thumbnail
 app.get('/api/thumbnails/:id', async (req, res) => {
   const DB = await getDB();
   const fileInfo = await DB.findOne<YTFile>(RecordTypes.THUMBNAIL_FILE, req.params.id);
@@ -182,7 +268,7 @@ app.get('/api/thumbnails/:id', async (req, res) => {
   return stream.pipe(res);
 });
 
-
+// get local video information
 app.get('/api/video/:id', async (req, res) => {
   const id = req.params.id;
   log.info(`video info request for id ${id}`);
