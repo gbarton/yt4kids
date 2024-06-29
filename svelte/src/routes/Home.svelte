@@ -69,7 +69,7 @@
 <div class="p-8">
   {#if data?.videos?.length > 0}
   <VideoCards videos={data.videos} authors={data.authors}>
-    <Button size="xs" slot="buttons" let:video class="w-fit" color="light" href="#/watch/{video.id}">
+    <Button size="xs" slot="buttons" let:video class="w-fit" color="light" href="/#/watch/{video.id}">
       View <ArrowRightOutline class="w-4 h-4 ms-2 text-black" />
     </Button>
   </VideoCards>
