@@ -37,6 +37,7 @@ export enum RecordTypes {
   THUMBNAIL_FILE = 'THUMBNAIL_FILE',
   VIDEO_FILE = 'VIDEO_FILE',
   DL_QUEUE = 'DL_QUEUE',
+  USER_PROFILE = "USER_PROFILE",
 };
 
 export interface YTRecord {
@@ -46,11 +47,21 @@ export interface YTRecord {
 
 /**
  * dunno how I feel about this one
- */
+*/
 export interface YTSearch {
   authorID?: string,
   search?: string,
   channelID?: string,
+}
+
+/**
+ * User management
+ */
+export interface YTProfile extends YTRecord {
+  displayName: string,
+  email: string,
+  pwHash: string,
+  admin: boolean,
 }
 
 export interface YTQueue extends YTRecord {
