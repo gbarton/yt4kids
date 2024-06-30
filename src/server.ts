@@ -2,7 +2,17 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
+
+// extend the express request object to allow a user object
+declare global {
+  namespace Express {
+    export interface Request {
+      user?: YTProfile
+    }
+  }
+}
+
 const app = express();
 import cors from 'cors';
 app.use(cors());
@@ -24,10 +34,10 @@ import getDB, { getVideos, addQueue, getUser } from "./lib/db/DB";
 import * as YT from './lib/yt/Downloader';
 import { existsSync, createReadStream, ReadStream } from 'fs';
 import ContentDisposition from 'content-disposition';
-import { MediaTypes, RecordTypes, SearchOptions, UploadDate, YTFile, YTProfile, YTQueue, YTSearch, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./lib/db/Types";
+import { MediaTypes, RecordTypes, SearchOptions, UploadDate, YTFile, YTPassword, YTProfile, YTQueue, YTSearch, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./lib/db/Types";
 
 import bcrypt from 'bcrypt'
-import jsonwebtoken from 'jsonwebtoken';
+import jsonwebtoken, { VerifyErrors } from 'jsonwebtoken';
 
 import Manager from './lib/queue/Manager';
 Manager.getInstance();
@@ -61,6 +71,65 @@ if (ACCESS_SECRET === "NO" || REFRESH_SECRET == "NO") {
   process.exit(1);
 }
 
+function generateLoginResponse(payload: YTProfile) {
+  // TODO: add expires env props
+  const accessToken = jsonwebtoken.sign(payload, ACCESS_SECRET, { expiresIn: "20s" });
+  const refreshToken = jsonwebtoken.sign(payload, REFRESH_SECRET, {expiresIn: "1d" });
+  return {
+    accessToken,
+    refreshToken,
+    user: payload,
+  };
+}
+
+function validateToken(req: Request, res: Response, next: NextFunction) {
+  // 400 bad, 401 Unauth (login) 403 Unauth (not allowed)
+    //get token from request header
+  const authHeader = req.headers["authorization"] || "";
+  const token = authHeader.split(" ")[1];
+  if (token == null) {
+    return res.status(400).send("Token not present");
+  }
+  jsonwebtoken.verify(token, ACCESS_SECRET, (err: any, user: any) => {
+    if (err) {
+      log.warn("auth verify fail");
+      return res.status(401).send("nope");
+    } else {
+      req.user = user as YTProfile;
+      next();
+    }
+  });
+}
+
+app.get('/api/testValid', validateToken, async (req, res) => {
+  log.info(req.user, 'validation succeeded');
+  return res.send("ok");
+});
+
+// user can request a new token set passing in their refreshToken
+// in the body as refreshToken
+app.post('/api/refreshToken', async (req, res) => {
+  log.info("refresh token request");
+  log.info(req.body);
+  const { refreshToken } = req?.body;
+  if (refreshToken === undefined) {
+    return res.status(400).send("no token");
+  }
+  jsonwebtoken.verify(refreshToken, REFRESH_SECRET, async (err: any, tokenObj: any) => {
+    if (err) {
+      log.warn(err, "error with users refresh token");
+      return res.status(404).send("error with refreshToken");
+    }
+    log.info(tokenObj, "refresh token verified");
+    const user = await getUser(tokenObj.email);
+    if (!user) {
+      return res.status(400).send("cant find user");
+    }
+
+    return res.send(generateLoginResponse(user));
+  });
+});
+
 app.post('/api/login', async (req, res) => {
   const { password, email } = req?.body;
   if ((password === undefined || password === null) || 
@@ -68,28 +137,19 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).send("missing creds");
   }
   const user = await getUser(email);
+  const DB = await getDB();
+  const pw = await DB.findOne<YTPassword>(RecordTypes.USER_PWHASH, email);
   // TODO: debounce?
-  if (!user) {
+  if (!user || !pw) {
     return res.status(400).send("user not found");
   }
-  if (!bcrypt.compare(password, user.pwHash)) {
+  if (!bcrypt.compare(password, pw.pwHash)) {
     return res.status(400).send("auth failed");
   }
   // all good, generate a JWT token
-  const payload = {
-    email: user.email,
-    displayName : user.displayName,
-    admin : user.admin,
-  }
-  // TODO: add expires env props
-  const accessToken = jsonwebtoken.sign(payload, ACCESS_SECRET, { expiresIn: "7d" });
-  const refreshToken = jsonwebtoken.sign(payload, REFRESH_SECRET, {expiresIn: "10d" });
+  const usrObj = generateLoginResponse(user);
   log.info(`logged in user ${user.email}`);
-  return res.send({
-    accessToken,
-    refreshToken,
-    user: payload,
-  });
+  return res.send(usrObj);
 });
 
 // src: https://medium.com/@prashantramnyc/authenticate-rest-apis-in-node-js-using-jwt-json-web-tokens-f0e97669aad3
@@ -98,7 +158,7 @@ app.get('/api/user', async (req, res) => {
   const DB = await getDB();
   const users = await DB.find<YTProfile>(RecordTypes.USER_PROFILE, {});
   // filter out password hash
-  return res.send(users.map(({email, displayName, admin}) => ({ email, displayName, admin })));
+  return res.send(users);
 });
 
 // create new user
@@ -110,6 +170,7 @@ app.post('/api/user', async (req, res) => {
     (email === undefined || email === null)) {
     return res.status(400).send("missing user information");
   }
+
   // TODO: validate email
   const DB = await getDB();
   const users = await DB.find<YTProfile>(RecordTypes.USER_PROFILE, { limit: 1 });
@@ -123,9 +184,14 @@ app.post('/api/user', async (req, res) => {
     email,
     displayName,
     admin: admin || users.length == 0,
+  }
+  const pwRecord : YTPassword = {
+    id: email,
+    recordType: RecordTypes.USER_PWHASH,
     pwHash: await bcrypt.hash(password, 10)
   }
   await DB.insertOrUpdateObj(userRecord);
+  await DB.insertOrUpdateObj(pwRecord);
   return res.send("ok");
 });
 

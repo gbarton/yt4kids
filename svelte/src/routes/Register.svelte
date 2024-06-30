@@ -15,7 +15,7 @@
           })
       });
       if (resp.ok) {
-        push("/#/login");
+        push("/login");
       } else {
         console.log('error registering ' + resp?.body)
       }

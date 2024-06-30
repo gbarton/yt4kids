@@ -1,7 +1,21 @@
 <script type="ts">
   import { push } from 'svelte-spa-router'
   import { Button, Checkbox, Label, Input } from 'flowbite-svelte';
-  import { authenticated, user } from '../lib/Store';
+  import { authenticate, loggedIn, user } from '../lib/Store';
+  import { onDestroy } from 'svelte';
+
+  const unsubLoggedIn = loggedIn.subscribe((yup) => {
+    console.log("caught loggedIn event, redirecting");
+    // can fire for empty event apparently
+    if (yup) {
+      push("/");
+    }
+  });
+
+  onDestroy(() => {
+    console.log("login destroyed");
+    unsubLoggedIn();
+  })
 
   let email = '', password = ''
 
@@ -14,16 +28,12 @@
             password
           })
       });
+      // if we got a valid response back, save our user object and tokens
       if (resp.ok) {
         console.log("logged in");
         const data = await resp.json();
-        user.set(data.user);
-        authenticated.set(true);
-        if (data.user.admin) {
-          push("/admin");
-        } else {
-          push("/");
-        }
+        // will update the loggedIn event we wait for
+        authenticate(data.user, data.accessToken, data.refreshToken);
       } else {
         console.log('error logging in ' + resp?.body)
       }

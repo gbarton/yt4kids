@@ -38,6 +38,7 @@ export enum RecordTypes {
   VIDEO_FILE = 'VIDEO_FILE',
   DL_QUEUE = 'DL_QUEUE',
   USER_PROFILE = "USER_PROFILE",
+  USER_PWHASH = "USER_PWHASH",
 };
 
 export interface YTRecord {
@@ -60,8 +61,11 @@ export interface YTSearch {
 export interface YTProfile extends YTRecord {
   displayName: string,
   email: string,
-  pwHash: string,
   admin: boolean,
+}
+
+export interface YTPassword extends YTRecord {
+  pwHash: string
 }
 
 export interface YTQueue extends YTRecord {
