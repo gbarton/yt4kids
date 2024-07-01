@@ -45,6 +45,11 @@ YK_LOKI_ADAPTER=disk
 # How often we try to download a video
 # too fast and you could get IP banned!
 YT_DOWNLOAD_INTERVAL=300000
+
+# these are the hash secrets for the access token and secret
+# tokens, please set these to something sane
+YT_ACCESS_SECRET=CHANGEME
+YT_REFRESH_SECRET=CHANGEMETOO
 ```
 
 ## Development

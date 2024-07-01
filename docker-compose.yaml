@@ -12,6 +12,8 @@ services:
       - YK_DB_STORAGE_DIR=./storage/db
       - YK_LOKI_ADAPTER=disk
       - YK_DB_TYPE=LOKI
+      - YT_ACCESS_SECRET=ASECRETINDEED
+      - YT_REFRESH_SECRET=REFRESHINGISGOOD
     ports:
       - "3001:3000"
     volumes:
