@@ -45,7 +45,7 @@ Manager.getInstance();
 // TODO: env
 const port = +(process.env.YT_PORT || 3000);
 
-import path from 'path'
+import path from 'path';
 
 app.use('/', express.static(path.join(__dirname, 'public')));
 
@@ -82,23 +82,49 @@ function generateLoginResponse(payload: YTProfile) {
   };
 }
 
+/**
+ * middleware that will ensure the user is valid and logged in
+ * @param req 
+ * @param res 
+ * @param next 
+ * @returns calls next() if all is well
+ */
 function validateToken(req: Request, res: Response, next: NextFunction) {
-  // 400 bad, 401 Unauth (login) 403 Unauth (not allowed)
+  // 400 bad, 401 Unauth (unknown login) 403 Unauth (known but not allowed)
     //get token from request header
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.split(" ")[1];
   if (token == null) {
-    return res.status(400).send("Token not present");
+    log.debug("no token to validate");
+    return res.status(401).send("please login");
   }
   jsonwebtoken.verify(token, ACCESS_SECRET, (err: any, user: any) => {
     if (err) {
       log.warn("auth verify fail");
-      return res.status(401).send("nope");
+      return res.status(403).send("I don't trust you, please login again");
     } else {
       req.user = user as YTProfile;
       next();
     }
   });
+}
+
+/**
+ * 
+ * @param req 
+ * @param res 
+ * @param next 
+ */
+function adminRole(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    log.warn("user not found trying to verify admin role!");
+    return res.status(401).send('who are you? Please login');
+  }
+  if (!req.user.admin) {
+    log.info(req.user.email, "user not admin");
+    return res.status(403).send("admin you are not");
+  }
+  return next();
 }
 
 app.get('/api/testValid', validateToken, async (req, res) => {
@@ -113,12 +139,12 @@ app.post('/api/refreshToken', async (req, res) => {
   log.info(req.body);
   const { refreshToken } = req?.body;
   if (refreshToken === undefined) {
-    return res.status(400).send("no token");
+    return res.status(400).send("unable to refresh your token, please login");
   }
   jsonwebtoken.verify(refreshToken, REFRESH_SECRET, async (err: any, tokenObj: any) => {
     if (err) {
       log.warn(err, "error with users refresh token");
-      return res.status(404).send("error with refreshToken");
+      return res.status(404).send("error with refreshToken, please login");
     }
     log.info(tokenObj, "refresh token verified");
     const user = await getUser(tokenObj.email);
@@ -143,8 +169,9 @@ app.post('/api/login', async (req, res) => {
   if (!user || !pw) {
     return res.status(400).send("user not found");
   }
-  if (!bcrypt.compare(password, pw.pwHash)) {
-    return res.status(400).send("auth failed");
+  const cryptResult = await bcrypt.compare(password, pw.pwHash);
+  if (!cryptResult) {
+    return res.status(401).send("auth failed");
   }
   // all good, generate a JWT token
   const usrObj = generateLoginResponse(user);
@@ -176,7 +203,7 @@ app.post('/api/user', async (req, res) => {
   const users = await DB.find<YTProfile>(RecordTypes.USER_PROFILE, { limit: 1 });
   let userRecord = await getUser(email);
   if (userRecord !== null) {
-    return res.status(400).send("User already exists");
+    return res.status(400).send("User already exists, use different email or login");
   }
   userRecord = {
     id: email,
@@ -199,7 +226,7 @@ const isMediaType = Util.inStringEnum(MediaTypes);
 const isUploadType = Util.inStringEnum(UploadDate);
 
 // search youtube for videos
-app.get('/api/yt/search', async (req, res) => {
+app.get('/api/yt/search', validateToken, adminRole, async (req, res) => {
   const {query, type, upload_date, page } = req?.query;
   if (!query) {
     return res.status(400).send('no query provided');
@@ -223,7 +250,7 @@ app.get('/api/yt/video/:authorID/:videoID', async (req, res) => {
 });
 
 // queue up video for downloading later
-app.post('/api/yt/video/queue', async (req, res) => {
+app.post('/api/yt/video/queue', validateToken, adminRole, async (req, res) => {
   log.info(req?.body, 'queue yt video post called');
   if (!req?.body || !req.body.authorID || !req.body.videoID || !req.body.title) {
     return res.status(400).send('missing body params {videoID, authorID, title}')
@@ -233,7 +260,7 @@ app.post('/api/yt/video/queue', async (req, res) => {
 });
 
 // download video right now
-app.post('/api/yt/video', async (req, res) => {
+app.post('/api/yt/video', validateToken, adminRole, async (req, res) => {
   log.info(req?.body, 'download yt video post called');
   if (!req?.body || !req.body.authorID || !req.body.videoID) {
     return res.status(400).send('missing body params {videoID, authorID}')

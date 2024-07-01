@@ -1,6 +1,7 @@
 <script type="ts">
   import { push } from 'svelte-spa-router'
   import { Button, Checkbox, Label, Input } from 'flowbite-svelte';
+    import { createErrorMessage } from '../lib/Store';
 
   let displayName = '', email = '', password = ''
 
@@ -18,6 +19,8 @@
         push("/login");
       } else {
         console.log('error registering ' + resp?.body)
+        const text = await resp.text();
+        createErrorMessage(text || "error registering, try again")
       }
   }
 </script>

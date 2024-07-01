@@ -2,34 +2,22 @@
   import "./app.css"
   import Router, { push } from 'svelte-spa-router'
   import routes from './routes'
-  import { Avatar, Navbar,Button, Dropdown, DropdownHeader, DropdownItem, DropdownDivider, Input, NavBrand, NavLi, NavUl, NavHamburger } from 'flowbite-svelte';
+  import { Avatar, Navbar, Button, Dropdown, DropdownHeader, DropdownItem, DropdownDivider, Input, NavBrand, NavLi, NavUl, NavHamburger } from 'flowbite-svelte';
   import { SearchOutline } from 'flowbite-svelte-icons';
-  import { loggedIn, logout, user } from './lib/Store';
+  import { loggedIn, logout, user, message } from './lib/Store';
+  import Messages from './lib/components/Messages.svelte';
 
-  // let email: string;
-  // let displayName: string;
-  // let admin: boolean = false;
-
-  // user.subscribe((u) => {
-  //   console.log("user information event in nav");
-  //   console.log(u);
-  //   if (!u) {
-  //     return;
-  //   }
-  //   email = u.email;
-  //   displayName = u.displayName;
-  //   admin = u.admin;
-  // });
   console.log("APP IS ONLINE (should only see once)");
 
   let query = "";
 
-function search() {
-  push(`/?search=${encodeURIComponent(query)}`);
-}
+  function search() {
+    push(`/?search=${encodeURIComponent(query)}`);
+  }
 
 </script>
-  
+
+<Messages/>
 
 <Navbar>
   <div class="flex md:order-2">

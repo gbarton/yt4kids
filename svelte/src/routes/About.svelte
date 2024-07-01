@@ -1,6 +1,7 @@
 <script lang="ts">
   import { secureFetch } from "../lib/SecureFetch";
   import { Button } from "flowbite-svelte";
+    import { createInfoMessage } from "../lib/Store";
 
   let authResults = ""
 
@@ -11,6 +12,7 @@
     });
     if (res.ok) {
       authResults = "WORKED";
+      createInfoMessage("test worked");
     } else {
       authResults = "Failed";
     }

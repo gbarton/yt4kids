@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { Select, Search, Button, Card, Toast} from 'flowbite-svelte';
+  import { Select, Search, Button, Card } from 'flowbite-svelte';
 
-  import { ArrowRightOutline, DownloadOutline, FolderPlusOutline, SearchOutline } from 'flowbite-svelte-icons';
+  import { ArrowRightOutline, DownloadOutline, SearchOutline } from 'flowbite-svelte-icons';
   
 	import type { YTQueue, YTSearchResponse, YTThumbnail } from '../lib/Types';
-  import type { Action } from 'svelte/action';
-
+  
   import {VideoCards} from '../lib/components';
+  import { secureFetch } from '../lib/SecureFetch';
+  import { createErrorMessage, createInfoMessage } from '../lib/Store';
 	
   
   const categories = [
@@ -37,7 +38,6 @@
   };
   // is a search going on right now
   let searching : boolean = false;
-  let messages : string[] = [];
 
   let selectCategory = 'all'
   let prevSearchString = '-1';
@@ -62,13 +62,9 @@
     return data as YTQueue[];
   }
 
-  // onMount(async () => {
-  //   queues = getQueue();
-  // });
-
   async function queueVideo(videoID: string, authorID: string, title: string) {
     console.log("add a video", videoID, authorID);
-    const resp = await fetch('/api/yt/video/queue', {
+    const resp = await secureFetch('/api/yt/video/queue', {
       method: 'POST',
       body: JSON.stringify({videoID, authorID, title}),
       headers: {
@@ -82,20 +78,14 @@
       return;
     }
     const message = `Video queued ${title.substring(0, 20)}...`;
-    messages.push(message);
-    setTimeout(() => {
-      const pos = messages.indexOf(message);
-      if (pos > -1) {
-        messages = messages.splice(pos, 1);
-      }
-    }, 5000);
+    createInfoMessage(message);
     console.log('queue response', data);
     queue = getQueue();
   }  
 
   async function addVideo(videoID: string, authorID: string) {
     console.log("add a video", videoID, authorID);
-    const resp = await fetch('/api/yt/video', {
+    const resp = await secureFetch('/api/yt/video', {
       method: 'POST',
       body: JSON.stringify({videoID, authorID}),
       headers: {
@@ -164,8 +154,9 @@
     }
     const encodedParams = new URLSearchParams(params).toString();
 
-    const res = await fetch('/api/yt/search?' + encodedParams);
-    if (res.status !== 200) {
+    const res = await secureFetch('/api/yt/search?' + encodedParams, {});
+    searching = false;
+    if (!res.ok) {
       console.log("error");
       data = {
         query: "",
@@ -173,6 +164,7 @@
         channels: [],
         authors: {},
       };
+      createErrorMessage("Error searching, please try again");
       return;
     }
 
@@ -199,7 +191,6 @@
         data.authors[k] = sr.authors[k];
       }
     }
-    searching = false;
   }
 
 </script>
@@ -223,12 +214,6 @@
   <div class="flex">
     <div class="flex-none w-1/4">
       <h5 class="mb-2 font-bold">Queue</h5>
-      {#if messages.length > 0}
-        {#each messages as msg}
-          <Toast>{msg}</Toast>
-        {/each}
-      {/if}
-
       {#await queue}
       ...Loading Queue
       {:then que}

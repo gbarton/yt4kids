@@ -1,4 +1,4 @@
-import { authenticate, logout, accessToken, refreshToken } from "./Store";
+import { authenticate, logout, accessToken, refreshToken, createErrorMessage } from "./Store";
 
 let a : string;
 let r : string;
@@ -23,7 +23,7 @@ export async function secureFetch(url: string, options : RequestInit) {
   }
   let resp = await fetch(url, options);
   // unauthorized, attempt refresh
-  if (!resp.ok && resp.status === 401) {
+  if (!resp.ok && resp.status === 403) {
     const refresh = await fetch('/api/refreshToken', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -31,6 +31,8 @@ export async function secureFetch(url: string, options : RequestInit) {
     });
     if (!refresh.ok) {
       logout();
+      const err = await refresh.text();
+      createErrorMessage(err || "Error talking to server");
       return refresh;
     }
     const data = await refresh.json();

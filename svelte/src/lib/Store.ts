@@ -40,9 +40,64 @@ export function authenticate(u: User, aToken: string, rToken: string) {
   loggedIn.set(true);
 }
 
+/**
+ * log the user out right now
+ */
 export function logout() {
   refreshToken.set("");
   accessToken.set("");
   loggedIn.set(false);
+  createInfoMessage("logged out!");
+}
 
+export type MessageType = "error" | "newVideo" | "loggedIn" | "info";
+export type Message = {
+  id: number,
+  type: MessageType,
+  msg: string,
+  dismissible: boolean,
+  timeout: number,
+}
+
+export const message = writable<Message>();
+
+export const messages = writable<Message[]>([]);
+
+export const dismissMessage = (id: number) => {
+  messages.update((all) => all.filter((t) => t.id !== id));
+};
+
+const addMessage = (type: MessageType, msg: string) => {
+  // Create a unique ID so we can easily find/remove it
+  // if it is dismissible/has a timeout.
+  const id = Math.floor(Math.random() * 10000);
+  const newMsg: Message = {
+    id,
+    type,
+    msg,
+    dismissible: true,
+    timeout: 15000
+  }
+
+  // Push the toast to the top of the list of toasts
+  messages.update((all) => [newMsg, ...all]);
+
+  // If msg Toast is dismissible, dismiss it after "timeout" amount of time.
+  if (newMsg.timeout) {
+    setTimeout(() => dismissMessage(id),
+    newMsg.timeout);
+  }
+};
+
+export function createErrorMessage(msg:string) {
+  console.log('created error message ' + msg);
+  addMessage("error", msg);
+}
+
+export function createLoginMessage(msg: string) {
+  addMessage("loggedIn", msg);
+}
+
+export function createInfoMessage(msg: string) {
+  addMessage("info", msg);
 }

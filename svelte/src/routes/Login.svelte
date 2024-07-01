@@ -1,7 +1,7 @@
 <script type="ts">
   import { push } from 'svelte-spa-router'
   import { Button, Checkbox, Label, Input } from 'flowbite-svelte';
-  import { authenticate, loggedIn, user } from '../lib/Store';
+  import { authenticate, createErrorMessage, createLoginMessage, loggedIn } from '../lib/Store';
   import { onDestroy } from 'svelte';
 
   const unsubLoggedIn = loggedIn.subscribe((yup) => {
@@ -34,8 +34,10 @@
         const data = await resp.json();
         // will update the loggedIn event we wait for
         authenticate(data.user, data.accessToken, data.refreshToken);
+        createLoginMessage("welcome " + data.user.displayName);
       } else {
-        console.log('error logging in ' + resp?.body)
+        console.log('error logging in ' + resp?.body);
+        createErrorMessage("Unable to login, try again");
       }
   }
 
