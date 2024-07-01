@@ -52,12 +52,15 @@ export async function cancellable<T>(fn: () => Promise<T>, timeMS: number = 1000
   let timer: NodeJS.Timeout;
   let cancelled = false;
   const p = new Promise<T>(async (resolve, reject) => {
-    timer = setTimeout(() => cancelled = true, timeMS);
+    timer = setTimeout(() => {
+      cancelled = true;
+      return reject(new Error("CANCEL TIMEOUT TRIGGERED"));
+    }, timeMS);
     const res : T = await fn();
     if (!cancelled) {
       return resolve(res);
     }
-    return reject(new Error("TIMEOUT EXCEEDED"));
+    return reject(new Error("TIMEOUT EXCEEDED (but shouldnt have hit this?"));
   }).finally(() => {
     clearTimeout(timer);
     if (cancelled) {
