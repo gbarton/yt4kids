@@ -140,6 +140,8 @@
     // new search, reset
     if (searchString !== prevSearchString) {
       pageNumber == 0;
+      data.videos = [];
+      data.channels = [];
       prevSearchString = searchString;
     } else {
       pageNumber += 1;
