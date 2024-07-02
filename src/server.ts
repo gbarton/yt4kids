@@ -243,10 +243,10 @@ app.get('/api/yt/search', validateToken, adminRole, async (req, res) => {
   return res.send(results);
 });
 
-// OBE (was for testing) download a video right now
-app.get('/api/yt/video/:authorID/:videoID', async (req, res) => {
-  await YT.downloadYTVideo(req.params.videoID, req.params.authorID);
-  res.send(req.params.videoID);
+// retrieve detailed video information
+app.get('/api/yt/video/:videoID', async (req, res) => {
+  const obj = await YT.getYTVideoDetails(req.params.videoID);
+  res.send(obj);
 });
 
 // queue up video for downloading later

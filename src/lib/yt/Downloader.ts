@@ -124,23 +124,6 @@ type DLExtraOpts = {
 
 type DLOpts = DownloadOptions & DLExtraOpts;
 
-// async function cancellable<T>(fn: () => Promise<T>, timeMS: number = 10000): Promise<T> {
-//   let timer: NodeJS.Timeout;
-//   const p = new Promise<T>(async (resolve, reject) => {
-//     let cancelled = false;
-//     timer = setTimeout(() => cancelled = true, timeMS);
-//     const res : T = await fn();
-//     if (!cancelled) {
-//       return resolve(res);
-//     }
-//     return reject();
-//   }).finally(() => {
-//     clearTimeout(timer);
-//   });
-
-//   return p;
-// }
-
 /**
  * Downloads a given yt video with the authorID
  * (cause the yt call doesnt seem to have author data!?)
@@ -153,23 +136,6 @@ async function download(id: string, dlObj: DLOpts, path: string) {
   const yt = await getYT();
  
   const stream = await Utils.cancellable<ReadableStream<Uint8Array>>(() => yt.download(id, dlObj), 5000);
-  // let timer : NodeJS.Timeout;
-  // const p = new Promise<ReadableStream>(async (resolve, reject) => {
-  //   let cancelled = false;
-  //   // wait 10s for
-  //   timer = setTimeout(() => cancelled = true, 10000);
-  //   const stream = await yt.download(id, dlObj);
-  //   if (!cancelled) {
-  //     return resolve(stream);
-  //   }
-  //   return reject();
-    
-  // }).finally(() => {
-  //   clearTimeout(timer);
-  // });
-
-  // const stream = await p;
-  // const stream = await yt.download(id, dlObj);
 
   const file = createWriteStream(path);
   let chunks = 0;
@@ -291,6 +257,21 @@ type CodecDetails = {
 
 type Codecs = {
   [key: string] : CodecDetails,
+}
+
+/**
+ * Pulls a detailed info report from yt
+ * @param videoID video to retrieve info from
+ */
+export async function getYTVideoDetails(videoID: string): Promise<any> {
+  try {
+    log.info(`retrieving detailed info for video ${videoID}`);
+    const info = await yt.getInfo(videoID);
+    return info;
+  } catch(err) {
+    log.warn(err, "Error getting video info");
+    return {error: "something didnt work"};
+  }
 }
 
 export async function downloadYTVideo(videoID: string, authorID: string) {

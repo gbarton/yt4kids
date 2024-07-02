@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Select, Search, Button, Card } from 'flowbite-svelte';
+  import { Select, Search, Button, Card, Modal } from 'flowbite-svelte';
 
-  import { ArrowRightOutline, DownloadOutline, SearchOutline } from 'flowbite-svelte-icons';
+  import { ArrowRightOutline, DownloadOutline, InfoCircleOutline, RefreshOutline, SearchOutline } from 'flowbite-svelte-icons';
   
 	import type { YTQueue, YTSearchResponse, YTThumbnail } from '../lib/Types';
   
@@ -195,6 +195,20 @@
     }
   }
 
+  // modal data
+  let showModal = false;
+  let modalData = "";
+
+  async function getVideoDetails(videoID: string) {
+    const res = await secureFetch('/api/yt/video/' + encodeURIComponent(videoID), {});
+    if (res.ok) {
+      // we are converting it to json and back to pretty print it
+      const data = await res.json();
+      modalData = JSON.stringify(data, null, 2);
+      showModal = true;
+    }
+  }
+
 </script>
 
 
@@ -202,6 +216,12 @@
 
 
 <div class="container">
+  <!-- Modal for showing video details-->
+   <Modal title="Video YT Details" bind:open={showModal}>
+    <pre>
+      {modalData}
+    </pre>
+   </Modal>
 
   <form class="flex" on:submit|preventDefault={handleSubmit}>
     <div class="relative">
@@ -257,18 +277,22 @@
           {#if video.fileID === undefined}
           <Button size="xs" class="w-fit" color="light"
             on:click="{() => queueVideo(video.id, video.authorID, video.title)}">
-            Queue <ArrowRightOutline class="w-6 h-6 ms-2 text-black" />
+            Queue <ArrowRightOutline class="w-4 h-4 ms-2 text-black" />
           </Button>
           {/if}
           {#if video.fileID !== undefined}
-          <Button size="xs" class="w-fit" color="light"
+          <Button size="xs" class="w-fit" color="yellow"
             on:click="{() => addVideo(video.id, video.authorID)}">
-            re-download <ArrowRightOutline class="w-6 h-6 ms-2 text-black" />
+            Reload <RefreshOutline class="w-4 h-4 ms-2 text-black red" />
           </Button>
           {/if}
           <Button size="xs" class="w-fit" color="light" disabled={video.fileID !== undefined}
             on:click="{() => addVideo(video.id, video.authorID)}">
-            Add <DownloadOutline class="w-6 h-6 ms-2 text-black" />
+            Add <DownloadOutline class="w-4 h-4 ms-2 text-black" />
+          </Button>
+          <Button size="xs" class="w-fit" color="light"
+            on:click="{() => getVideoDetails(video.id)}">
+            Details <InfoCircleOutline class="w-4 h-4 ms-2 text-black" />
           </Button>
         </svelte:fragment>
       </VideoCards>
