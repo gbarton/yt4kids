@@ -21,5 +21,14 @@
 
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
-	"runArgs": ["-p=3000:3000"]
+	"runArgs": [
+		"-p=3000:3000"
+	],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"svelte.svelte-vscode"
+			]
+		}
+	}
 }
