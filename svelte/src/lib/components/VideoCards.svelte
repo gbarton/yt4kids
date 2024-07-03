@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Select, Search, Button, Avatar, Card } from 'flowbite-svelte';
+  import { Avatar, Card } from 'flowbite-svelte';
 
-  import type { YTThumbnail, YTChannelInfo, YTAuthor, YTVideoInfo } from '../Types';
+  import type { YTThumbnail, YTAuthor, YTVideoInfo } from '../Types';
 
   export let videos: YTVideoInfo[];
   export let authors: {[key: string] : YTAuthor};
@@ -20,19 +20,16 @@
       || "";
   }
 
-  function selectAuthor(authorID: string): void {
-
-  }
 </script>
 
 {#if videos?.length > 0}
 <div class="container">
   <h4 class="text-2xl mb-2 font-bold">Videos</h4>
   <!-- <div class="grid grid-flow-col auto-cols-max"> -->
-  <div class="grid grid-cols-3 gap-4">
+  <div class="grid md:grid-cols-3 md:gap-4 xl:grid-cols-4">
     {#each videos as video}
-    <div>
-      <Card img="{getBestThumbnail(video.thumbnails)}">
+    
+      <Card img="{getBestThumbnail(video.thumbnails)}" class="mb-2">
         <div class="flex">
           <div class="flex-none w-14">
             <a href="#/search?authorID={video.authorID}">
@@ -50,7 +47,7 @@
           </div>
         </div>
       </Card>
-    </div>
+    
     {/each}
   </div>
 </div>

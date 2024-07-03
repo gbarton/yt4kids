@@ -75,7 +75,7 @@
   {/each}
 </div>
 
-<div class="p-8">
+<div class="md:p-8">
   {#if data?.videos?.length > 0}
   <VideoCards videos={data.videos} authors={data.authors}>
     <Button size="xs" slot="buttons" let:video class="w-fit" color="light" href="/#/watch/{video.id}">
