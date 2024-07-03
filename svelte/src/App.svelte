@@ -12,6 +12,7 @@
   let query = "";
 
   function search() {
+    console.log('search requested');
     push(`/?search=${encodeURIComponent(query)}`);
   }
 

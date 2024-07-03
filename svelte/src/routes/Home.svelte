@@ -1,25 +1,15 @@
 <script lang="ts">
   import { Badge, Button } from 'flowbite-svelte';
-  import { ArrowRightOutline, DownloadOutline, SearchOutline } from 'flowbite-svelte-icons';
+  import { ArrowRightOutline, CloseCircleOutline } from 'flowbite-svelte-icons';
   
   import { VideoCards } from '../lib/components';
 
-  import { querystring } from 'svelte-spa-router';
+  import { querystring, push } from 'svelte-spa-router';
 
   import { onMount } from 'svelte';
   import type { YTSearchResponse } from '../lib/Types';
 
-  type KV = {
-    key: string,
-    value: string,
-  }
-
-  let options : KV[] = [];
-
-  let data : YTSearchResponse;
-  console.log("home page log");
-
-  onMount(async () => {
+  async function load() {
     console.log('homepage server url params');
     console.log($querystring);
     console.log($querystring === "");
@@ -31,10 +21,10 @@
     const searchParams = new URLSearchParams(queryStr);
     console.log(searchParams.toString());
     let searchString = '';
+    options = [];
     if (searchParams.size > 0) {
       console.log('enough params to send');
       searchString += '?' + searchParams;
-      options = [];
       searchParams.forEach((val, k) => {
         options.push({ key : k, value: val});
       });
@@ -56,13 +46,32 @@
     console.log(items);
     // console.log(items.authors['UCK9X9/JACEsonjbqaewUtICA']);
     data = items as YTSearchResponse;
+  }
+
+  $: {
+    console.log(`triggered from new params update: '${$querystring}'`);
+    load();
+  }
+  
+  type KV = {
+    key: string,
+    value: string,
+  }
+
+  let options : KV[] = [];
+
+  let data : YTSearchResponse;
+  console.log("home page log");
+
+  onMount(() => {
+    load();
   });
 
 </script>
 
 <div class="p-8">
   {#each options as opt}
-    <Badge color="dark">{opt.key}</Badge>
+    <Button color="alternative" on:click="{() => {push('/')}}">{opt.key}: {opt.value} <CloseCircleOutline class="w-5 h-5 ms-2"/></Button>
   {/each}
 </div>
 
