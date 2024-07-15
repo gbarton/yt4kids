@@ -37,7 +37,7 @@
       <Avatar id="avatar-menu" border class="{$loggedIn ? 'ring-green-400' : 'ring-red-400'}" />
       <NavHamburger class1="w-full md:flex md:w-auto md:order-1" />
     </div>
-    <NavHamburger></NavHamburger>
+    <!-- <NavHamburger></NavHamburger> -->
   </div>
   <Dropdown placement="bottom" triggeredBy="#avatar-menu">
     {#if $loggedIn}
