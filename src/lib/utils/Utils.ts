@@ -56,9 +56,15 @@ export async function cancellable<T>(fn: () => Promise<T>, timeMS: number = 1000
       cancelled = true;
       return reject(new Error("CANCEL TIMEOUT TRIGGERED"));
     }, timeMS);
-    const res : T = await fn();
-    if (!cancelled) {
-      return resolve(res);
+    try {
+      const res : T = await fn();
+      if (!cancelled) {
+        return resolve(res);
+      }
+    } catch (err) {
+      log.warn(err, "cancellable caught error");
+      reject(err); // TODO: need to figure out why code calling isnt handling this and have to throw
+      throw err;
     }
     return reject(new Error("TIMEOUT EXCEEDED (but shouldnt have hit this?"));
   }).finally(() => {

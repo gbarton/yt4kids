@@ -131,6 +131,7 @@ type DLOpts = DownloadOptions & DLExtraOpts;
  * @param dlObj options to send to innertube
  * @param path where to store the file
  */
+// TODO: something in here calls acorn and explodes
 async function download(id: string, dlObj: DLOpts, path: string) {
   log.info(dlObj, "Download Options");
   const yt = await getYT();
@@ -142,12 +143,15 @@ async function download(id: string, dlObj: DLOpts, path: string) {
   let percent = 0;
   const total = dlObj.contentLength;
 
+  log.info(`aquired stream for video ${id}`);
+
   const bytesOnDisk = await Utils.cancellable<number>(async (): Promise<number> => {
       // need to wait on the write to ensure the file is completely ready
       for await (const chunk of YTTools.streamToIterable(stream)) {
         const p = new Promise((resolve, reject) => {
           file.write(chunk, (err) => {
             if (err) {
+              log.error(err, "stream error");
               return reject(err);
             }
             return resolve(path);
