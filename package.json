@@ -38,6 +38,6 @@
     "pino": "^9.1.0",
     "pino-http": "^10.1.0",
     "pino-pretty": "^11.0.0",
-    "youtubei.js": "^9.4.0"
+    "youtubei.js": "^10.1.0"
   }
 }
