@@ -431,6 +431,8 @@ app.get('/api/video/chunk/:id', async (req, res) => {
     headers = {
       'Content-Range': responseRange,
       'Accept-Ranges': 'bytes',
+      // 'Content-Length': fileSize, // doesnt work
+      // 'X-Content-Type-Options': 'nosniff',  // no effect
       'Content-Length': chunksize,
       'Content-Type': contentType[record.fileExtention],
       'Content-Disposition': ContentDisposition(path),
