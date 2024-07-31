@@ -106,7 +106,7 @@ export default class LokiDatabase implements IDB {
   async getOrCreateDB(type: RecordTypes): Promise<Collection<any>> {
     // make sure that the type is correct
     if (!(type in RecordTypes)) {
-      log.info(`unknown type ${type}`);
+      log.debug(`unknown type ${type}`);
       throw new Error(`unknown type: ${type}`);
     }
     const db = await this.ensureDatabaseIsOpen();
@@ -125,7 +125,7 @@ export default class LokiDatabase implements IDB {
   async findOne<T extends YTRecord>(type: RecordTypes, id: string): Promise<T | null> {
     // ? obsolete with TS?
     if (Utils.isNull(id)) {
-      log.info(`missing id for type: ${type}`);
+      log.warn(`missing id for type: ${type}`);
       throw new Error(`object of type ${type} has no id`);
     }
   
@@ -193,7 +193,7 @@ export default class LokiDatabase implements IDB {
    * @param {QueryOptions} [options] object with query clauses
    */
   public async find(type: RecordTypes, options: QueryOptions) {
-    log.info(options, `find ${type}`);
+    log.debug(options, `find ${type}`);
     const results = await this.fetch(type, options);
     return results.data();
   }
@@ -204,7 +204,7 @@ export default class LokiDatabase implements IDB {
    * @param {QueryOptions} [options] object with query clauses
    */
   public async removeAll(type: RecordTypes, options: QueryOptions) {
-    log.info(options, `removeAll: ${type}`);
+    log.debug(options, `removeAll: ${type}`);
     const results = await this.fetch(type, options);
     await results.remove();
   }
@@ -215,13 +215,22 @@ export default class LokiDatabase implements IDB {
    * @param {RecordTypes} type what type of record to delete
    * @param {string} id of the record to delete
    */
-  public async remove(type: RecordTypes, id: string) {
-    log.info(id, `remove called: ${type}`);
+  public async delete<T extends YTRecord>(obj: T): Promise<boolean> {
+    log.debug(`remove called: ${obj.recordType}`);
   
-    const record = await this.findOne(type, id);
-    const db = await this.ensureDatabaseIsOpen()
-    const coll = await db.getCollection(type);
-    await coll.remove(record);
+    try {
+      const record = await this.findOne(obj.recordType, obj.id);
+      // records gone
+      if (!record) {
+        return true;
+      }
+      let coll = await this.getOrCreateDB(obj.recordType);
+      await coll.remove(record);
+      return true;
+    } catch (err) {
+      log.warn(err, 'failed to delete a record');
+      return false;
+    }
   }
   
   /**
@@ -240,12 +249,12 @@ export default class LokiDatabase implements IDB {
     if (Utils.isNull(record)) {
       record = json;
       await coll.insert(record);
-      log.info(`inserted ${obj.recordType}: ${record.id}`);
+      log.debug(`inserted ${obj.recordType}: ${record.id}`);
     } else {
       // update the existing record with new fields
       Object.assign(record, json);
       await coll.update(record);
-      log.info(`updated ${obj.recordType}: ${record.id}`);
+      log.debug(`updated ${obj.recordType}: ${record.id}`);
     }
   }
 }

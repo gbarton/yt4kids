@@ -14,6 +14,7 @@ export interface YTRecord {
 }
 
 export interface YTQueue extends YTRecord {
+  id: string,
   authorID: string,
   title: string,
   complete: boolean,

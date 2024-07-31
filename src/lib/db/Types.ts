@@ -160,6 +160,7 @@ export interface IDB {
   findOne<T extends YTRecord>(type: RecordTypes, id: string): Promise<T | null>,
   find<T extends YTRecord>(type: RecordTypes, options: QueryOptions): Promise<T[]>,
   insertOrUpdateObj<T extends YTRecord>(obj: T): Promise<void>,
+  delete<T extends YTRecord>(obj: T): Promise<boolean>,
 }
 
 

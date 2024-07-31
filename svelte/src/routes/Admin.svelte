@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Select, Search, Button, Card, Modal } from 'flowbite-svelte';
 
-  import { ArrowRightOutline, DownloadOutline, InfoCircleOutline, RefreshOutline, SearchOutline } from 'flowbite-svelte-icons';
+  import { ArrowRightOutline, CheckCircleOutline, CloseOutline, DownloadOutline, InfoCircleOutline, RefreshOutline, SearchOutline } from 'flowbite-svelte-icons';
   
 	import type { YTQueue, YTSearchResponse, YTThumbnail } from '../lib/Types';
   
@@ -209,6 +209,19 @@
     }
   }
 
+  let selectedQueueItem: string;
+
+  async function deleteQueueRecord(queueItem: YTQueue) {
+    const res = await secureFetch("/api/queue", {
+      method: 'DELETE',
+      body: JSON.stringify(queueItem),
+      headers: {
+				'content-type': 'application/json',
+			}
+    });
+    queue = getQueue();
+  }
+
 </script>
 
 
@@ -239,9 +252,27 @@
       {#await queue}
       ...Loading Queue
       {:then que}
-        {#each que as q}
-          <p class="text-sm">{q.title} {q.complete ? "done" : ""}</p>
+      <ul>
+        {#each que as q (q.id)}
+          <li class="flex flex-col text-sm">
+            <button on:click="{() => selectedQueueItem == q.id ? selectedQueueItem = "" : selectedQueueItem = q.id}">
+              <span class="flex flex-row justify-between">
+                <p>{q.title}</p>
+                {#if q.complete}
+                  <CheckCircleOutline size="sm" color="green" class="ml-2"></CheckCircleOutline>
+                {/if}
+              </span>
+            </button>
+            {#if selectedQueueItem == q.id}
+            <span>
+              <button on:click="{() => deleteQueueRecord(q)}" class="flex flex-row p-1 rounded hover:bg-red-600 bg-red-800 text-white">
+                <CloseOutline color="white" class="w-4 h-4 mt-1" />Delete
+              </button>
+            </span>
+            {/if}
+          </li>
         {/each}
+      </ul>
       {/await}
 
     </div>
