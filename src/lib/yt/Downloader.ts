@@ -139,42 +139,52 @@ async function download(id: string, dlObj: DLOpts, path: string) {
   const stream = await Utils.cancellable<ReadableStream<Uint8Array>>(() => yt.download(id, dlObj), 5000);
 
   const file = createWriteStream(path);
-  let chunks = 0;
-  let percent = 0;
-  const total = dlObj.contentLength;
-
-  log.info(`aquired stream for video ${id}`);
-
-  const bytesOnDisk = await Utils.cancellable<number>(async (): Promise<number> => {
-      // need to wait on the write to ensure the file is completely ready
-      for await (const chunk of YTTools.streamToIterable(stream)) {
-        const p = new Promise((resolve, reject) => {
-          file.write(chunk, (err) => {
-            if (err) {
-              log.error(err, "stream error");
-              return reject(err);
-            }
-            return resolve(path);
+  try {
+    let chunks = 0;
+    let percent = 0;
+    const total = dlObj.contentLength;
+  
+    log.info(`aquired stream for video ${id}`);
+  
+    const bytesOnDisk = await Utils.cancellable<number>(async (): Promise<number> => {
+        // need to wait on the write to ensure the file is completely ready
+        for await (const chunk of YTTools.streamToIterable(stream)) {
+          const p = new Promise((resolve, reject) => {
+            file.write(chunk, (err) => {
+              if (err) {
+                log.error(err, "stream error");
+                return reject(err);
+              }
+              return resolve(path);
+            });
           });
-        });
-        await p;
-        chunks += chunk.length;
-        if (Math.round(chunks / total * 100) >= percent + 10.0) {
-          percent = Math.round(chunks / total * 100);
-          log.info(`${percent}% (${chunks}/${total})`);
+          await p;
+          chunks += chunk.length;
+          if (Math.round(chunks / total * 100) >= percent + 10.0) {
+            percent = Math.round(chunks / total * 100);
+            log.info(`${percent}% (${chunks}/${total})`);
+          }
         }
-      }
-      
-      percent = Math.round(chunks / total * 100);
-      log.info(`${percent}% ${path} chunks written ${chunks}/${total}`);
+        
+        percent = Math.round(chunks / total * 100);
+        log.info(`${percent}% ${path} chunks written ${chunks}/${total}`);
+        file.end();
+        // file.close();
+        return getFilesizeInBytes(path);
+  
+    }, 1000 * 60 * 10); // 10m timeout
+    log.info(`bytes on disk: ${bytesOnDisk}/${total}`)
+  } catch (err) {
+    log.warn("unable to download file, cleaning up");
+    if(file) {
       file.end();
-      // file.close();
-      return getFilesizeInBytes(path);
-
-  }, 1000 * 60 * 10); // 10m timeout
-  log.info(`bytes on disk: ${bytesOnDisk}/${total}`)
-
-  // log.info(`bytes on disk: ${getFilesizeInBytes(path)}/${total}`)
+    }
+    // clean up if we were partly through a file dl when we errored
+    if (existsSync(path)) {
+      rm(path);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -319,7 +329,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
   if (!info || info === null)
     return { error: 'ErrorCantConnectToServiceAPI' };
 
-  if (info.playability_status.status !== 'OK') return { error: 'ErrorYTUnavailable' };
+  if (!info.playability_status || info.playability_status.status !== 'OK') return { error: 'ErrorYTUnavailable' };
   if (info.basic_info.is_live) return { error: 'ErrorLiveVideo' };
 
   // return a critical error if returned video is "Video Not Available"
@@ -361,7 +371,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
   if (!bestVideoFormat || bestVideoFormat === null) {
     return { error: "No suitable video format" }
   }
-  log.info(bestVideoFormat, "Best Video Format full");
+  log.debug(bestVideoFormat, "Best Video Format full");
   // we know we have a label, we tested for it
   videoQuality = bestVideoFormat.quality_label || "";
 
@@ -402,7 +412,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
     if (!bestAudioFormat || bestAudioFormat === null) {
       return { error: "No suitable audio format" }
     }
-    log.info(bestAudioFormat, "Best Audio Format full");
+    log.debug(bestAudioFormat, "Best Audio Format full");
 
     dlObj = {
       type: 'audio',
@@ -412,7 +422,21 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
 
     const tmpAudioFile = tmpFilePath();
 
-    await download(videoID, dlObj, tmpAudioFile);
+    // if audio fails, we need to remove the tmp video file
+    let i = 0;
+    while (i < 3) {
+      log.info(`Attempting audio dl try: ${i}`);
+      try {
+        await download(videoID, dlObj, tmpAudioFile);
+        i = 3;
+      } catch (err) {
+        i += 1;
+        if (i == 3) {
+          rm(tmpVideoFile);
+          throw err;
+        }
+      }
+    }
 
     const combinedFile = `${tmpFilePath(codecMatch[format].fileExtention)}`;
 

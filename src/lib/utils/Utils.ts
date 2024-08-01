@@ -63,8 +63,7 @@ export async function cancellable<T>(fn: () => Promise<T>, timeMS: number = 1000
       }
     } catch (err) {
       log.warn(err, "cancellable caught error");
-      reject(err); // TODO: need to figure out why code calling isnt handling this and have to throw
-      throw err;
+      reject(err);
     }
     return reject(new Error("TIMEOUT EXCEEDED (but shouldnt have hit this?"));
   }).finally(() => {
