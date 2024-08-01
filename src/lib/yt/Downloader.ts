@@ -336,8 +336,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
   // or a similar stub by youtube
   if (info.basic_info.id !== videoID) {
       return {
-          error: 'ErrorCantConnectToServiceAPI',
-          critical: true
+          error: 'ErrorCantConnectToServiceAPI'
       }
   }
 

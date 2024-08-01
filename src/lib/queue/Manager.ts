@@ -44,16 +44,18 @@ export default class Manager {
 
     log.info(q, 'next to dl');
 
-    await Downloader.downloadYTVideo(q.id, q.authorID).catch((err) => {
+    const obj = await Downloader.downloadYTVideo(q.id, q.authorID).catch((err) => {
       log.warn(`unable to download video: ${q.id}`);
       log.error(err);
-      this.running = false;
-      return;
+      return { error: "yup" };
     });
 
-    q.complete = true;
-    const DB = await getDB();
-    await DB.insertOrUpdateObj<YTQueue>(q);
+    // TODO: add count to queue record for attempts
+    if (!obj.error) {
+      q.complete = true;
+      const DB = await getDB();
+      await DB.insertOrUpdateObj<YTQueue>(q);
+    }
 
     // SUPER lame way to force it to wait a while longer
     const that = this;

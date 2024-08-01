@@ -247,15 +247,16 @@
   </form>
 
   <div class="flex">
-    <div class="flex-none w-1/4">
-      <h5 class="mb-2 font-bold">Queue</h5>
+    <div class="flex-none w-1/4 rounded p-2 mr-2 mt-2 drop-shadow-md">
+      <h4 class="text-2xl mb-2 font-bold">Queue</h4>
+      
       {#await queue}
       ...Loading Queue
       {:then que}
-      <ul>
+      <ul class="divide-y divide-blue-800">
         {#each que as q (q.id)}
-          <li class="flex flex-col text-sm">
-            <button on:click="{() => selectedQueueItem == q.id ? selectedQueueItem = "" : selectedQueueItem = q.id}">
+          <li class="flex flex-col text-sm pt-1 pb-1">
+            <button class="hover:text-blue-800 hover:bg-blue-100" on:click="{() => selectedQueueItem == q.id ? selectedQueueItem = "" : selectedQueueItem = q.id}">
               <span class="flex flex-row justify-between">
                 <p>{q.title}</p>
                 {#if q.complete}
@@ -264,10 +265,15 @@
               </span>
             </button>
             {#if selectedQueueItem == q.id}
-            <span>
-              <button on:click="{() => deleteQueueRecord(q)}" class="flex flex-row p-1 rounded hover:bg-red-600 bg-red-800 text-white">
-                <CloseOutline color="white" class="w-4 h-4 mt-1" />Delete
-              </button>
+            <span class="flex flex-row gap-2">
+              <Button  size="xs" class="w-fit" color="red"
+                on:click="{() => deleteQueueRecord(q)}">
+                Delete <CloseOutline color="white" class="w-4 h-4 ms-2" />
+              </Button>
+              <Button size="xs" class="w-fit text-black" color="yellow"
+                on:click="{() => addVideo(q.id, q.authorID)}">
+                Reload <RefreshOutline class="w-4 h-4 ms-2 text-black" />
+            </Button>
             </span>
             {/if}
           </li>
@@ -276,9 +282,9 @@
       {/await}
 
     </div>
-    <div class="grow">
+    <div class="grow mt-2 p-2">
       {#if data?.channels?.length > 0}
-      <div class="container">
+      <div class="container pb-2">
         <h4 class="text-2xl mb-2 font-bold">Channels</h4>
         <!-- <div class="grid grid-flow-col auto-cols-max"> -->
         <div class="grid grid-cols-3 gap-4">
