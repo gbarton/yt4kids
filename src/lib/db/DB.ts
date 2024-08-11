@@ -32,6 +32,8 @@ export async function addQueue(videoID: string, authorID: string, title: string)
     title,
     complete: false,
     requestedDate: new Date(),
+    attempts: 0,
+    skip: false,
     id: videoID,
     recordType: RecordTypes.DL_QUEUE
   }
@@ -39,11 +41,11 @@ export async function addQueue(videoID: string, authorID: string, title: string)
   return q;
 }
 
-export async function getQueue(limit: number = 1): Promise<YTQueue[]> {
+export async function getQueued(limit: number = 1): Promise<YTQueue[]> {
   const DB = await getDB();
   const results = await DB.find<YTQueue>(RecordTypes.DL_QUEUE, {
     limit,
-    clause: { complete: false },
+    clause: { complete: false, skip: false },
     sortBy: 'requestedDate',
     sortByDescending: true,
   });

@@ -1,5 +1,5 @@
 import log from "../log/Logger";
-import getDB, { getQueue } from '../db/DB';
+import getDB, { getQueued } from '../db/DB';
 import * as Downloader from '../yt/Downloader';
 import { YTQueue } from "../db/Types";
 
@@ -10,10 +10,14 @@ export default class Manager {
   private interval: number = 300000;
   private timer : NodeJS.Timer;
   private running: Boolean = false;
+  private skipAfter: number = 10;
 
   private constructor() {
     if (process.env.YT_DOWNLOAD_INTERVAL) {
       this.interval = +process.env.YT_DOWNLOAD_INTERVAL;
+    }
+    if (process.env.YT_DOWNLOAD_RETRIES) {
+      this.skipAfter = +process.env.YT_DOWNLOAD_RETRIES;
     }
     const that = this;
     this.timer = setInterval(() => {
@@ -32,7 +36,7 @@ export default class Manager {
   }
 
   private async downloadVideos() {
-    const queue = await getQueue(20);
+    const queue = await getQueued(20);
     
     if (queue.length == 0) {
       return;
@@ -50,12 +54,17 @@ export default class Manager {
       return { error: "yup" };
     });
 
-    // TODO: add count to queue record for attempts
     if (!obj.error) {
       q.complete = true;
-      const DB = await getDB();
-      await DB.insertOrUpdateObj<YTQueue>(q);
+    } else {
+      q.attempts = (q.attempts ? q.attempts : 0) + 1
+      if (q.attempts >= this.skipAfter) {
+        q.skip = true;
+      }
     }
+
+    const DB = await getDB();
+    await DB.insertOrUpdateObj<YTQueue>(q);
 
     // SUPER lame way to force it to wait a while longer
     const that = this;

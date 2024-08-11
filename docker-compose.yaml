@@ -14,9 +14,12 @@ services:
       - YK_DB_TYPE=LOKI
       - YT_ACCESS_SECRET=ASECRETINDEED
       - YT_REFRESH_SECRET=REFRESHINGISGOOD
+      - YT_ACCESS_DURATION=1d
+      - YT_REFRESH_DURATION=1w
+      - YT_DOWNLOAD_INTERVAL=60000
     ports:
       - "3001:3000"
     volumes:
-      - "/disk/1/storage:/app/storage"
+      - "/disk/2/storage:/app/storage"
 
     

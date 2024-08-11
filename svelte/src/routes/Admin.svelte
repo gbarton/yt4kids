@@ -222,6 +222,17 @@
     queue = getQueue();
   }
 
+  async function toggleSkip(queueItem: YTQueue) {
+    const res = await secureFetch(`/api/queue/${queueItem.id}/skip`, {
+      method: "POST",
+      body: JSON.stringify(queueItem),
+      headers: {
+				'content-type': 'application/json',
+			}
+    });
+    queue = getQueue();
+  }
+
 </script>
 
 
@@ -255,7 +266,9 @@
       {:then que}
       <ul class="divide-y divide-blue-800">
         {#each que as q (q.id)}
+        <!-- each queue item -->
           <li class="flex flex-col text-sm pt-1 pb-1">
+            <!-- title button -->
             <button class="hover:text-blue-800 hover:bg-blue-100" on:click="{() => selectedQueueItem == q.id ? selectedQueueItem = "" : selectedQueueItem = q.id}">
               <span class="flex flex-row justify-between">
                 <p>{q.title}</p>
@@ -264,8 +277,12 @@
                 {/if}
               </span>
             </button>
+            <!-- expanded options -->
             {#if selectedQueueItem == q.id}
-            <span class="flex flex-row gap-2">
+            <span class="flex p-2">
+              DL tries: {q.attempts ? q.attempts : 0}
+            </span>
+            <span class="flex flex-row gap-2 p-2">
               <Button  size="xs" class="w-fit" color="red"
                 on:click="{() => deleteQueueRecord(q)}">
                 Delete <CloseOutline color="white" class="w-4 h-4 ms-2" />
@@ -273,7 +290,12 @@
               <Button size="xs" class="w-fit text-black" color="yellow"
                 on:click="{() => addVideo(q.id, q.authorID)}">
                 Reload <RefreshOutline class="w-4 h-4 ms-2 text-black" />
-            </Button>
+              </Button>
+              <Button size="xs" class="w-fit" color="{q.skip ? 'dark' : 'light'}"
+                on:click="{() => toggleSkip(q)}">
+                Skip{q.skip ? "ped" : ""}
+              </Button>
+
             </span>
             {/if}
           </li>

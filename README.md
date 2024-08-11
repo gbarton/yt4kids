@@ -45,11 +45,19 @@ YK_LOKI_ADAPTER=disk
 # How often we try to download a video
 # too fast and you could get IP banned!
 YT_DOWNLOAD_INTERVAL=300000
+# Retry attempts for queued items
+# some videos just dont come down so skip after this many tries
+YT_DOWNLOAD_RETRIES=10
 
 # these are the hash secrets for the access token and secret
 # tokens, please set these to something sane
 YT_ACCESS_SECRET=CHANGEME
 YT_REFRESH_SECRET=CHANGEMETOO
+# access duration (can be human format, e.g. 20s, 4h, 1d)
+YT_ACCESS_DURATION=1d
+# refresh token duration (can be human format, e.g. 20s, 4h, 1d)
+YT_REFRESH_DURATION=1w
+
 ```
 
 ## Development

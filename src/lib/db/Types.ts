@@ -73,6 +73,8 @@ export interface YTQueue extends YTRecord {
   title: string,
   complete: boolean,
   requestedDate: Date,
+  attempts: number,
+  skip: boolean,
 }
 
 export type YTThumbnail = {

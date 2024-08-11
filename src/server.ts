@@ -288,14 +288,40 @@ app.get('/api/queue', async (req, res) => {
   return res.send(queue);
 });
 
+// toggle skip this queue item
+app.post('/api/queue/:id/skip', async (req, res) => {
+  log.info(req?.body, 'skip queue post called');
+  if (!req?.body || !req.body.id || !req.body.recordType) {
+    return res.status(400).send('missing body params {id, recordType}');
+  }
+  if (req.body.recordType !== RecordTypes.DL_QUEUE) {
+    return res.status(400).send('does not look like a queue record');
+  }
+  const DB = await getDB();
+  const record = await DB.findOne<YTQueue>(RecordTypes.DL_QUEUE, req.body.id);
+  if (!record) {
+    return res.status(400).send("unable to find record");
+  }
+  record.skip = !record.skip;
+  // reset the attempts so it will try again
+  if (!record.skip) {
+    record.attempts = 0;
+  }
+  await DB.insertOrUpdateObj<YTQueue>(record);
+  return res.send(record);
+});
+
 // delete an object in the queue, sometimes videos glitch and just wont DL
-app.delete('/api/queue', validateToken, async( req, res) => {
+app.delete('/api/queue', validateToken, adminRole, async( req, res) => {
   log.debug(`${req.body} delete queue record called`);
   if (!req?.body || !req.body.id || !req.body.recordType) {
     return res.status(400).send('missing body params {id, recordType}');
   }
+  if (req.body.recordType !== RecordTypes.DL_QUEUE) {
+    return res.status(400).send('does not look like a queue record');
+  }
   const DB = await getDB();
-  const record = await DB.findOne(req.body.recordType, req.body.id);
+  const record = await DB.findOne(RecordTypes.DL_QUEUE, req.body.id);
   if (!record) {
     return res.send('ok');
   }

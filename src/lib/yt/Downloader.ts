@@ -399,7 +399,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
 
   const tmpVideoFile = tmpFilePath();
   let finalTmpFile = tmpVideoFile;
-
+  // TODO: wrap in retry logic!
   await download(videoID, dlObj, tmpVideoFile);
 
   if (!hasAudio) {
