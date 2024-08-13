@@ -41,7 +41,7 @@ export default class Manager {
     if (queue.length == 0) {
       return;
     }
-    log.info(`queue length: ${queue.length}+`);
+    log.info(`queue length: ${queue.length}`);
     
     this.running = true;
     const q = queue[0];

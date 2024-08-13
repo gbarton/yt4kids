@@ -3,7 +3,7 @@ import log from "../log/Logger";
 // TODO: stop using sync!
 import { createWriteStream, existsSync, mkdirSync, statSync } from 'fs';
 import { rename, rm } from 'node:fs/promises';
-import { Innertube, Utils as YTTools } from 'youtubei.js';
+import { ClientType, Innertube, Utils as YTTools } from 'youtubei.js';
 import * as Utils from '../utils/Utils';
 import getDB from "../db/DB";
 
@@ -22,15 +22,16 @@ import { ReadableStream } from "stream/web";
 log.info(ffmpegPath, "FFMPEG path");
 
 let initialized = false;
-let yt : Innertube;
+let innertube : Innertube;
+const CLIENT_TYPE = ClientType.IOS;
 
 
-async function getYT(): Promise<Innertube> {
+async function getYT(client_type?: ClientType): Promise<Innertube> {
   // TODO: support testing by returning a mock one
-  if (Utils.isNull(yt) || initialized === false) {
-    yt = await Innertube.create({/* options */});
-  }
-  return yt;
+  // if (Utils.isNull(innertube) || initialized === false) {
+    innertube = await Innertube.create({ client_type, retrieve_player: true });
+  // }
+  return innertube;
 }
 
 function getStorageDir(): string {
@@ -134,13 +135,13 @@ type DLOpts = DownloadOptions & DLExtraOpts;
 // TODO: something in here calls acorn and explodes
 async function download(id: string, dlObj: DLOpts, path: string) {
   log.info(dlObj, "Download Options");
-  const yt = await getYT();
+  const yt = await getYT(ClientType.TV_EMBEDDED);
  
   const stream = await Utils.cancellable<ReadableStream<Uint8Array>>(() => yt.download(id, dlObj), 5000);
 
   const file = createWriteStream(path);
+  let chunks = 0;
   try {
-    let chunks = 0;
     let percent = 0;
     const total = dlObj.contentLength;
   
@@ -175,7 +176,7 @@ async function download(id: string, dlObj: DLOpts, path: string) {
     }, 1000 * 60 * 10); // 10m timeout
     log.info(`bytes on disk: ${bytesOnDisk}/${total}`)
   } catch (err) {
-    log.warn("unable to download file, cleaning up");
+    log.warn(`unable to download file, cleaning up ${chunks} bytes`);
     if(file) {
       file.end();
     }
@@ -280,6 +281,7 @@ type Codecs = {
 export async function getYTVideoDetails(videoID: string): Promise<any> {
   try {
     log.info(`retrieving detailed info for video ${videoID}`);
+    const yt = await getYT();
     const info = await yt.getInfo(videoID);
     return info;
   } catch(err) {
@@ -317,7 +319,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
   let info : VideoInfo;
   try {
     log.info('retrieving video info');
-    info = await yt.getBasicInfo(videoID, 'WEB');
+    info = await yt.getBasicInfo(videoID);//, "TV_EMBEDDED");// , 'WEB');
     log.info("info retrieved");
 
   } catch (error) {
@@ -395,6 +397,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
     // format: 'mp4',
     format: codecMatch[format].fileExtention,
     contentLength: bestVideoFormat.content_length || 0,
+    client: 'TV_EMBEDDED'
   }
 
   const tmpVideoFile = tmpFilePath();
@@ -417,6 +420,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
       type: 'audio',
       quality: 'best',
       contentLength: bestAudioFormat.content_length || 0,
+      client: 'TV_EMBEDDED',
     }
 
     const tmpAudioFile = tmpFilePath();

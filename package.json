@@ -6,6 +6,7 @@
     "build": "npx tsc",
     "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
+    "yt": "nodemon src/yt.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "nodemonConfig": {
