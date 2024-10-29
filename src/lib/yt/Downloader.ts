@@ -21,17 +21,11 @@ import { ReadableStream } from "stream/web";
 
 log.info(ffmpegPath, "FFMPEG path");
 
-let initialized = false;
 let innertube : Innertube;
-const CLIENT_TYPE = ClientType.IOS;
-
 
 async function getYT(client_type?: ClientType): Promise<Innertube> {
   // TODO: support testing by returning a mock one
-  // if (Utils.isNull(innertube) || initialized === false) {
-    innertube = await Innertube.create({ client_type, retrieve_player: true });
-  // }
-  return innertube;
+    return Innertube.create({ client_type, retrieve_player: true });
 }
 
 function getStorageDir(): string {
@@ -135,7 +129,7 @@ type DLOpts = DownloadOptions & DLExtraOpts;
 // TODO: something in here calls acorn and explodes
 async function download(id: string, dlObj: DLOpts, path: string) {
   log.info(dlObj, "Download Options");
-  const yt = await getYT(ClientType.TV_EMBEDDED);
+  const yt = await getYT(ClientType.TV);
  
   const stream = await Utils.cancellable<ReadableStream<Uint8Array>>(() => yt.download(id, dlObj), 5000);
 
@@ -319,7 +313,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
   let info : VideoInfo;
   try {
     log.info('retrieving video info');
-    info = await yt.getBasicInfo(videoID);//, "TV_EMBEDDED");// , 'WEB');
+    info = await yt.getBasicInfo(videoID);
     log.info("info retrieved");
 
   } catch (error) {
@@ -397,7 +391,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
     // format: 'mp4',
     format: codecMatch[format].fileExtention,
     contentLength: bestVideoFormat.content_length || 0,
-    client: 'TV_EMBEDDED'
+    client: 'TV'
   }
 
   const tmpVideoFile = tmpFilePath();
@@ -420,7 +414,7 @@ export async function downloadYTVideo(videoID: string, authorID: string) {
       type: 'audio',
       quality: 'best',
       contentLength: bestAudioFormat.content_length || 0,
-      client: 'TV_EMBEDDED',
+      client: 'TV',
     }
 
     const tmpAudioFile = tmpFilePath();
