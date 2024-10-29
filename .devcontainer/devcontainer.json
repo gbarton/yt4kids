@@ -11,7 +11,7 @@
 	},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	"forwardPorts": [3000],
+	// "forwardPorts": [3000],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "yarn install",
@@ -21,9 +21,9 @@
 
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
-	"runArgs": [
-		"-p=3000:3000"
-	],
+	// "runArgs": [
+	// 	"-p=3000:3000"
+	// ],
 	"customizations": {
 		"vscode": {
 			"extensions": [
