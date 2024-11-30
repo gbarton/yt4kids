@@ -289,11 +289,11 @@
               </Button>
               <Button size="xs" class="w-fit text-black" color="yellow"
                 on:click="{() => addVideo(q.id, q.authorID)}">
-                Reload <RefreshOutline class="w-4 h-4 ms-2 text-black" />
+                Force Reload <RefreshOutline class="w-4 h-4 ms-2 text-black" />
               </Button>
               <Button size="xs" class="w-fit" color="{q.skip ? 'dark' : 'light'}"
                 on:click="{() => toggleSkip(q)}">
-                Skip{q.skip ? "ped" : ""}
+                {q.skip ? "Re-queue" : "Skip"}
               </Button>
 
             </span>
