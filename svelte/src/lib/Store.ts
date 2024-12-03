@@ -1,54 +1,91 @@
 import { writable } from 'svelte/store'
+import { secureFetch } from './SecureFetch';
 
 //reference them with $ notation, e.g. $authenticated for proper cleanup & reactivity
-
-// is the user logged in
-export const loggedIn = writable(false);
 
 export interface User {
   email: string,
   admin: boolean,
   displayName: string
 }
-// do we have a refresh token in local storage we can use?
-// @see https://dev.to/danawoodman/svelte-quick-tip-connect-a-store-to-local-storage-4idi
-const lsRFToken = localStorage.getItem("refreshToken");
 
 /**
  * the user object
  */
 export const user = writable<User>();
 
-export const accessToken = writable<string>();
-export const refreshToken = writable<string>(lsRFToken || undefined);
 
-// if we set refresh token at any point, write it to storage
-// TODO: make a checkbox on login for 'keep me logged in' and only store then
-refreshToken.subscribe((token) => {
-  if (token && token.length > 0) {
-    localStorage.setItem("refreshToken", token);
-  } else {
-    localStorage.removeItem("refreshToken");
+// is the user logged in
+export const loggedIn = writable(false);
+export const token = writable('');
+
+// see if we have a token in local storage to pull
+const loadedToken = localStorage.getItem('token');
+if (loadedToken && loadedToken.length > 0) {
+  console.log('loaded token from localstorage');
+
+  const res = await fetch('/api/user/profile', {
+    headers: {'x-cflr-token': loadedToken}
+  });
+  if (res.ok) {
+    const profile = await res.json();
+    authenticated(profile, loadedToken);
   }
+} else {
+  console.log('didnt see a token to load');
+}
+
+token.subscribe((t: string) => {
+  localStorage.setItem('token', t);
+  console.log(`set localstorage to '${t}'`);
 });
 
-export function authenticate(u: User, aToken: string, rToken: string) {
-  console.log("authenticate function called");
-  refreshToken.set(rToken);
-  accessToken.set(aToken);
+
+export function authenticated( u: User, t: string) {
+  console.log('authenticated called');
+  token.set(t);
   user.set(u);
   loggedIn.set(true);
 }
 
-/**
- * log the user out right now
- */
-export function logout() {
-  refreshToken.set("");
-  accessToken.set("");
+export async function logout() {
+  console.log('logout called');
+  await secureFetch('/api/user/logout', { method: 'POST'});
   loggedIn.set(false);
-  createInfoMessage("logged out!");
+  token.set('');
 }
+
+
+// export const accessToken = writable<string>();
+// export const refreshToken = writable<string>(lsRFToken || undefined);
+
+// // if we set refresh token at any point, write it to storage
+// // TODO: make a checkbox on login for 'keep me logged in' and only store then
+// refreshToken.subscribe((token) => {
+//   if (token && token.length > 0) {
+//     localStorage.setItem("refreshToken", token);
+//   } else {
+//     localStorage.removeItem("refreshToken");
+//   }
+// });
+
+// export function authenticate(u: User, aToken: string, rToken: string) {
+//   console.log("authenticate function called");
+//   refreshToken.set(rToken);
+//   accessToken.set(aToken);
+//   user.set(u);
+//   loggedIn.set(true);
+// }
+
+// /**
+//  * log the user out right now
+//  */
+// export function logout() {
+//   refreshToken.set("");
+//   accessToken.set("");
+//   loggedIn.set(false);
+//   createInfoMessage("logged out!");
+// }
 
 export type MessageType = "error" | "newVideo" | "loggedIn" | "info";
 export type Message = {

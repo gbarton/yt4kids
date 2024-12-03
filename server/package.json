@@ -1,0 +1,28 @@
+{
+  "name": "server",
+  "version": "1.0.50",
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target=bun",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "bun run --watch src/index.ts"
+  },
+  "dependencies": {
+    "@bogeychan/elysia-logger": "^0.1.4",
+    "@elysiajs/cors": "^1.1.1",
+    "@elysiajs/cron": "^1.1.1",
+    "@elysiajs/jwt": "^1.1.1",
+    "@elysiajs/static": "^1.1.1",
+    "@elysiajs/stream": "^1.1.0",
+    "@elysiajs/swagger": "^1.1.6",
+    "@types/lokijs": "^1.5.14",
+    "elysia": "latest",
+    "ffmpeg-static": "^5.2.0",
+    "lokijs": "^1.5.12",
+    "uuid": "^11.0.3",
+    "youtubei.js": "^11.0.1"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "module": "src/index.js"
+}

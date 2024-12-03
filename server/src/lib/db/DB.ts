@@ -1,6 +1,6 @@
-import { IDB, QueryOptions, RecordTypes, YTAuthor, YTProfile, YTQueue, YTSearch, YTSearchResponse, YTThumbnail, YTVideoInfo } from "./Types";
+import { IDB, QueryOptions, RecordTypes, YTAuthor, YTProfile, YTQueue, YTSearch, YTSearchResponse, YTThumbnail, YTVideoInfo } from './Types';
 import LokiDatabase from "./LokiDB";
-import log from '../log/Logger'
+import log from '../Log';
 
 let builtDb: IDB;
 
@@ -12,7 +12,7 @@ export default async function getDB(): Promise<IDB> {
     return Promise.resolve(builtDb);
   }
 
-  const dbType = process.env.YK_DB_TYPE || 'LOKI';
+  const dbType = Bun.env.YK_DB_TYPE || 'LOKI';
   // TODO: change to switch whenever I get a second db type
   builtDb = new LokiDatabase();
   await builtDb.init();
@@ -20,26 +20,26 @@ export default async function getDB(): Promise<IDB> {
   return Promise.resolve(builtDb);
 }
 
-export async function getUser(email: string): Promise<YTProfile | null> {
-  const DB = await getDB();
-  return DB.findOne<YTProfile>(RecordTypes.USER_PROFILE, email);
-}
+// export async function getUser(email: string): Promise<YTProfile | null> {
+//   const DB = await getDB();
+//   return DB.findOne<YTProfile>(RecordTypes.USER_PROFILE, email);
+// }
 
-export async function addQueue(videoID: string, authorID: string, title: string): Promise<YTQueue> {
-  const DB = await getDB();
-  const q : YTQueue = {
-    authorID,
-    title,
-    complete: false,
-    requestedDate: new Date(),
-    attempts: 0,
-    skip: false,
-    id: videoID,
-    recordType: RecordTypes.DL_QUEUE
-  }
-  await DB.insertOrUpdateObj<YTQueue>(q);
-  return q;
-}
+// export async function addQueue(videoID: string, authorID: string, title: string): Promise<YTQueue> {
+//   const DB = await getDB();
+//   const q : YTQueue = {
+//     authorID,
+//     title,
+//     complete: false,
+//     requestedDate: new Date(),
+//     attempts: 0,
+//     skip: false,
+//     id: videoID,
+//     recordType: RecordTypes.DL_QUEUE
+//   }
+//   await DB.insertOrUpdateObj<YTQueue>(q);
+//   return q;
+// }
 
 export async function getQueued(limit: number = 1): Promise<YTQueue[]> {
   const DB = await getDB();

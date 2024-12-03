@@ -1,4 +1,4 @@
-import log from '../log/Logger';
+import log from '../Log';
 
 /**
  * null test
@@ -49,7 +49,7 @@ export function inStringEnum<E extends string>(strEnum: Record<string, E>) {
  * @returns whatever is typed on the function
  */
 export async function cancellable<T>(fn: () => Promise<T>, timeMS: number = 10000): Promise<T> {
-  let timer: NodeJS.Timeout;
+  let timer: Timer;
   let cancelled = false;
   const p = new Promise<T>(async (resolve, reject) => {
     timer = setTimeout(() => {

@@ -12,7 +12,7 @@
       || thumbnails.find((t) => t.size === 'tiny')?.fileID || "";
 
     if (id.length > 0) {
-      return `/api/thumbnails/${id}`;
+      return `/api/videos/thumbnail/${id}`;
     }
     return thumbnails.find((t) => t.size === 'medium')?.url
       || thumbnails.find((t) => t.size === 'small')?.url

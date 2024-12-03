@@ -8,5 +8,8 @@ export default defineConfig({
 		proxy: {
 			'/api' : 'http://localhost:3123',
 		}
+	},
+	build: {
+		target: "es2022",
 	}
 })

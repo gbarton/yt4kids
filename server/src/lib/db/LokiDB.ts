@@ -1,4 +1,4 @@
-import log from '../log/Logger'
+import log from '../Log'
 import Loki from 'lokijs';
 //@ts-ignore
 import LokiFastAdapter from 'lokijs/src/loki-fs-structured-adapter.js';
@@ -15,7 +15,7 @@ export default class LokiDatabase implements IDB {
   initialized = false;
 
   constructor() {
-    this.LOC = process.env.YK_DB_STORAGE_DIR || 'db';
+    this.LOC = Bun.env.YK_DB_STORAGE_DIR || 'db';
     this.DBPATH = path.join(this.LOC, 'yt4kids.db');
     log.info(`using db path : ${this.DBPATH}`);
   }
@@ -56,7 +56,7 @@ export default class LokiDatabase implements IDB {
       }
       log.info('initializing db');
   
-      const whichAdapter = adapterType || process.env.YK_LOKI_ADAPTER || 'memory';
+      const whichAdapter = adapterType || Bun.env.YK_LOKI_ADAPTER || 'memory';
       let adapter = new Loki.LokiMemoryAdapter();
       if (whichAdapter === 'disk') {
         adapter = new LokiFastAdapter();
@@ -71,19 +71,30 @@ export default class LokiDatabase implements IDB {
       this.db = new Loki(this.DBPATH, {
         adapter,
         autoload: true,
-        autoloadCallback: (err) => {
+        autoloadCallback: async (err) => {
           if (err) {
             return reject(err);
           }
           log.info('database online');
           this.initialized = true;
           if (this.db !== undefined) {
+            // initialize our collections
+            const keys = Object.values(RecordTypes);
+            const db = this.db;
+            keys.forEach(async (t) => {
+              let coll = await db.getCollection(t);
+              if (Utils.isNull(coll)) {
+                db.addCollection(t);
+                log.info(`created database collection: ${t}`);
+              }
+            })
             return resolve(this.db);
           }
         },
         autosave: true,
         autosaveInterval: 500,
       });
+
     });
   }
   

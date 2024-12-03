@@ -1,7 +1,5 @@
-import log from "../log/Logger";
-import getDB, { getQueued } from '../db/DB';
-import * as Downloader from '../yt/Downloader';
-import { YTQueue } from "../db/Types";
+import Logger from "./Log";
+import { Tube } from "./routes/YT";
 
 export default class Manager {
   // our one and only copy
@@ -12,19 +10,22 @@ export default class Manager {
   private running: Boolean = false;
   private skipAfter: number = 10;
 
+  private yt: Tube;
+
   private constructor() {
-    if (process.env.YT_DOWNLOAD_INTERVAL) {
-      this.interval = +process.env.YT_DOWNLOAD_INTERVAL;
+    if (Bun.env.YT_DOWNLOAD_INTERVAL) {
+      this.interval = +Bun.env.YT_DOWNLOAD_INTERVAL;
     }
-    if (process.env.YT_DOWNLOAD_RETRIES) {
-      this.skipAfter = +process.env.YT_DOWNLOAD_RETRIES;
+    if (Bun.env.YT_DOWNLOAD_RETRIES) {
+      this.skipAfter = +Bun.env.YT_DOWNLOAD_RETRIES;
     }
     const that = this;
     this.timer = setInterval(() => {
-      log.info('manager interval check');
+      Logger.info('manager interval check');
       that.tick();
     },
     this.interval);
+    this.yt = new Tube();
   }
 
   public static getInstance(): Manager {
@@ -36,21 +37,17 @@ export default class Manager {
   }
 
   private async downloadVideos() {
-    const queue = await getQueued(20);
-    
-    if (queue.length == 0) {
+    this.running = true;
+    const q = await this.yt.getNextQueuedDL();
+    if (!q) {
       return;
     }
-    log.info(`queue length: ${queue.length}`);
-    
-    this.running = true;
-    const q = queue[0];
 
-    log.info(q, 'next to dl');
+    Logger.info(q, 'next to dl');
 
-    const obj = await Downloader.downloadYTVideo(q.id, q.authorID).catch((err) => {
-      log.warn(`unable to download video: ${q.id}`);
-      log.error(err);
+    const obj = await this.yt.downloadYTVideo(q.id, q.authorID).catch((err) => {
+      Logger.warn(`unable to download video: ${q.id}`);
+      Logger.error(err);
       return { error: "yup" };
     });
 
@@ -63,13 +60,12 @@ export default class Manager {
       }
     }
 
-    const DB = await getDB();
-    await DB.insertOrUpdateObj<YTQueue>(q);
+    await this.yt.updateQueue(q);
 
     // SUPER lame way to force it to wait a while longer
     const that = this;
     setTimeout(() => {
-      log.info("manager free");
+      Logger.info("manager free");
       that.running = false;
     }, this.interval);
   }
@@ -81,7 +77,7 @@ export default class Manager {
     if (!this.running) {
       this.downloadVideos();
     } else {
-      log.info('manager already busy');
+      Logger.info('manager already busy');
     }
   }
 }

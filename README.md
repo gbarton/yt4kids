@@ -49,14 +49,6 @@ YT_DOWNLOAD_INTERVAL=300000
 # some videos just dont come down so skip after this many tries
 YT_DOWNLOAD_RETRIES=10
 
-# these are the hash secrets for the access token and secret
-# tokens, please set these to something sane
-YT_ACCESS_SECRET=CHANGEME
-YT_REFRESH_SECRET=CHANGEMETOO
-# access duration (can be human format, e.g. 20s, 4h, 1d)
-YT_ACCESS_DURATION=1d
-# refresh token duration (can be human format, e.g. 20s, 4h, 1d)
-YT_REFRESH_DURATION=1w
 
 ```
 
@@ -65,15 +57,18 @@ YT_REFRESH_DURATION=1w
 Download the project locally, start two shells, one for the backend server, the other for the ui.
 
 ```bash
-# backend express server
+# backend bun/elysia
+cd server
 # install deps
-npm install
+bun install
+bun install -g pino-pretty
 
 # run server in dev mode
-npm run dev
+npm dev | pino-pretty
 ```
 
 ```bash
+cd svelte
 ## in separate bash shell, run ui:
 npm install
 

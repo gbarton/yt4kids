@@ -31,7 +31,7 @@
     }
 
 
-    const res = await fetch('/api/search' + searchString);
+    const res = await fetch('/api/videos/search' + searchString);
     if (res.status !== 200) {
       console.log("error");
       data = {

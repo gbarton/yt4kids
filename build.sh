@@ -3,17 +3,19 @@
 set -e
 set -x
 
-rm -rf dist/*
+rm -rf server/dist/*
 
 cd svelte
 npm install
 pwd
 npm run build
 
-cd ../
-npm install
-npm run build
+cd ../server
+bun install
+bun run build
 mkdir -p dist/public
-cp -r svelte/dist/* dist/public
+cp -r ../svelte/dist/* dist/public
 
-docker build -t yt4kids .
+cd ../
+
+docker build -t yt4kids:$(date '+%Y-%m-%d') .
