@@ -3,7 +3,7 @@ services:
   yt4kids:
     container_name: yt4kids
       #image: yt4kids:latest
-    image: yt4kids:2024-12-03
+    image: yt4kids:latest
     # build:
     #   context: .
     restart: always

@@ -18,4 +18,4 @@ cp -r ../svelte/dist/* dist/public
 
 cd ../
 
-docker build -t yt4kids:$(date '+%Y-%m-%d') .
+docker build -t yt4kids:$(date '+%Y-%m-%d') -t yt4kids:latest .
