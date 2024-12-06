@@ -8,7 +8,10 @@
   import {VideoCards} from '../lib/components';
   import { secureFetch } from '../lib/SecureFetch';
   import { createErrorMessage, createInfoMessage } from '../lib/Store';
-	
+  import { getSearchParams } from '../lib/Utils';
+  import { onMount } from 'svelte';
+  import { querystring } from 'svelte-spa-router';
+
   
   const categories = [
     {
@@ -195,6 +198,14 @@
     }
   }
 
+  onMount(() => {
+    const searchParams = getSearchParams($querystring || "");
+    if(searchParams.has('search')) {
+      searchString = searchParams.get('search') || "";
+      handleSubmit();
+    }
+  });
+
   // modal data
   let showModal = false;
   let modalData = "";
@@ -258,6 +269,7 @@
   </form>
 
   <div class="flex">
+    <!-- queue bar -->
     <div class="flex-none w-1/4 rounded p-2 mr-2 mt-2 drop-shadow-md">
       <h4 class="text-2xl mb-2 font-bold">Queue</h4>
       
@@ -304,61 +316,70 @@
       {/await}
 
     </div>
+    <!-- content bar -->
     <div class="grow mt-2 p-2">
-      {#if data?.channels?.length > 0}
-      <div class="container pb-2">
-        <h4 class="text-2xl mb-2 font-bold">Channels</h4>
-        <!-- <div class="grid grid-flow-col auto-cols-max"> -->
-        <div class="grid grid-cols-3 gap-4">
-          {#each data.channels as channel }
-          <div>
-            <Card img="{getBestThumbnail(data.authors[channel.authorID].thumbnails)}" horizontal size="lg">
-              <h5 class="mb-2 text-lg font-bold tracking-tight text-gray-900 dark:text-white">
-                {channel.name}
-              </h5>
-              <p class="mb-3 font-normal text-gray-700 dark:text-gray-400 leading-tight">
-                {data.authors[channel.authorID].name}
-              </p>
-              <Button size="xs" class="w-fit" color="light">
-                Follow <DownloadOutline class="w-4 h-4 ms-2 text-black" />
-              </Button>
-      
-            </Card>
+      <!-- no content -->
+      {#if searching}
+        <h4>Searching</h4>
+      {/if}
+      <!-- content showed up -->
+      {#if !searching && (data?.channels?.length > 0 || data?.videos?.length > 0)}
+        {#if data?.channels?.length > 0}
+        <div class="container pb-2">
+          <h4 class="text-2xl mb-2 font-bold">Channels</h4>
+          <!-- <div class="grid grid-flow-col auto-cols-max"> -->
+          <div class="grid grid-cols-3 gap-4">
+            {#each data.channels as channel }
+            <div>
+              <Card img="{getBestThumbnail(data.authors[channel.authorID].thumbnails)}" horizontal size="lg">
+                <h5 class="mb-2 text-lg font-bold tracking-tight text-gray-900 dark:text-white">
+                  {channel.name}
+                </h5>
+                <p class="mb-3 font-normal text-gray-700 dark:text-gray-400 leading-tight">
+                  {data.authors[channel.authorID].name}
+                </p>
+                <Button size="xs" class="w-fit" color="light">
+                  Follow <DownloadOutline class="w-4 h-4 ms-2 text-black" />
+                </Button>
+        
+              </Card>
+            </div>
+            {/each}
           </div>
-          {/each}
         </div>
-      </div>
+        {/if}
+        
+        {#if data?.videos?.length > 0}
+        <VideoCards {...data}>
+          <svelte:fragment slot="buttons" let:video>
+            {#if video.fileID === undefined}
+            <Button size="xs" class="w-fit" color="light"
+              on:click="{() => queueVideo(video.id, video.authorID, video.title)}">
+              Queue <ArrowRightOutline class="w-4 h-4 ms-2 text-black" />
+            </Button>
+            {/if}
+            {#if video.fileID !== undefined}
+            <Button size="xs" class="w-fit" color="yellow"
+              on:click="{() => addVideo(video.id, video.authorID)}">
+              Reload <RefreshOutline class="w-4 h-4 ms-2 text-black red" />
+            </Button>
+            {/if}
+            <Button size="xs" class="w-fit" color="light" disabled={video.fileID !== undefined}
+              on:click="{() => addVideo(video.id, video.authorID)}">
+              Add <DownloadOutline class="w-4 h-4 ms-2 text-black" />
+            </Button>
+            <Button size="xs" class="w-fit" color="light"
+              on:click="{() => getVideoDetails(video.id)}">
+              Details <InfoCircleOutline class="w-4 h-4 ms-2 text-black" />
+            </Button>
+          </svelte:fragment>
+        </VideoCards>
+        <div use:loadMore>
+          ...loading more
+        </div>
+        {/if}
       {/if}
-      
-      {#if data?.videos?.length > 0}
-      <VideoCards {...data}>
-        <svelte:fragment slot="buttons" let:video>
-          {#if video.fileID === undefined}
-          <Button size="xs" class="w-fit" color="light"
-            on:click="{() => queueVideo(video.id, video.authorID, video.title)}">
-            Queue <ArrowRightOutline class="w-4 h-4 ms-2 text-black" />
-          </Button>
-          {/if}
-          {#if video.fileID !== undefined}
-          <Button size="xs" class="w-fit" color="yellow"
-            on:click="{() => addVideo(video.id, video.authorID)}">
-            Reload <RefreshOutline class="w-4 h-4 ms-2 text-black red" />
-          </Button>
-          {/if}
-          <Button size="xs" class="w-fit" color="light" disabled={video.fileID !== undefined}
-            on:click="{() => addVideo(video.id, video.authorID)}">
-            Add <DownloadOutline class="w-4 h-4 ms-2 text-black" />
-          </Button>
-          <Button size="xs" class="w-fit" color="light"
-            on:click="{() => getVideoDetails(video.id)}">
-            Details <InfoCircleOutline class="w-4 h-4 ms-2 text-black" />
-          </Button>
-        </svelte:fragment>
-      </VideoCards>
-      <div use:loadMore>
-        ...loading more
-      </div>
-      {/if}
+      <!-- results -->
     </div>
   </div>
 

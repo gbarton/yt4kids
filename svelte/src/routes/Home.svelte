@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Badge, Button } from 'flowbite-svelte';
-  import { ArrowRightOutline, CloseCircleOutline } from 'flowbite-svelte-icons';
+  import { ArrowRightOutline, CloseCircleOutline, SearchOutline } from 'flowbite-svelte-icons';
   
   import { VideoCards } from '../lib/components';
 
@@ -9,27 +9,25 @@
   import { onMount } from 'svelte';
   import type { YTSearchResponse } from '../lib/Types';
 
-  async function load() {
-    console.log('homepage server url params');
-    console.log($querystring);
-    console.log($querystring === "");
-    let queryStr = $querystring;
-    if (queryStr === "") {
-      queryStr = window.location.search;
-      console.log("using window params: " + queryStr);
-    }
-    const searchParams = new URLSearchParams(queryStr);
-    console.log(searchParams.toString());
-    let searchString = '';
-    options = [];
-    if (searchParams.size > 0) {
-      console.log('enough params to send');
-      searchString += '?' + searchParams;
-      searchParams.forEach((val, k) => {
-        options.push({ key : k, value: val});
-      });
-    }
+  import { user } from '../lib/Store'
+    import { getSearchParams } from '../lib/Utils';
 
+  let admin = false;
+
+  user.subscribe((u) => {
+    if (u && u.admin) {
+      admin = true;
+    }
+  });
+
+  async function load() {
+    const searchParams = getSearchParams($querystring || "");
+    options = [];
+    searchParams.forEach((val, k) => {
+      options.push({ key : k, value: val});
+    });
+
+    const searchString = '?' + searchParams;
 
     const res = await fetch('/api/videos/search' + searchString);
     if (res.status !== 200) {
@@ -78,9 +76,16 @@
 <div class="md:p-8">
   {#if data?.videos?.length > 0}
   <VideoCards videos={data.videos} authors={data.authors}>
-    <Button size="xs" slot="buttons" let:video class="w-fit" color="light" href="/#/watch/{video.id}">
-      View <ArrowRightOutline class="w-4 h-4 ms-2 text-black" />
-    </Button>
+    <svelte:fragment slot="buttons" let:video>
+      <Button size="xs" slot="buttons" class="w-fit" color="light" href="/#/watch/{video.id}">
+        View <ArrowRightOutline class="w-4 h-4 ms-2 text-black" />
+      </Button>
+      {#if admin}
+      <Button size="xs" slot="buttons" class="w-fit" color="light" href="/#/admin?search={data?.authors[video.authorID].name}">
+        Search <SearchOutline class="w-4 h-4 ms-2 text-black" />
+      </Button>
+      {/if}
+    </svelte:fragment>
   </VideoCards>
   {/if}
 
