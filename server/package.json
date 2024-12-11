@@ -15,14 +15,14 @@
     "@elysiajs/stream": "^1.1.0",
     "@elysiajs/swagger": "^1.1.6",
     "@types/lokijs": "^1.5.14",
-    "elysia": "latest",
+    "elysia": "^1.1.26",
     "ffmpeg-static": "^5.2.0",
     "lokijs": "^1.5.12",
     "uuid": "^11.0.3",
-    "youtubei.js": "^11.0.1"
+    "youtubei.js": "^12.1.0"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "bun-types": "^1.1.38"
   },
   "module": "src/index.js"
 }
