@@ -39,7 +39,9 @@ export default class Manager {
   private async downloadVideos() {
     this.running = true;
     const q = await this.yt.getNextQueuedDL();
+    // no work to do
     if (!q) {
+      this.running = false;
       return;
     }
 

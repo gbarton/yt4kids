@@ -25,7 +25,34 @@ import { adminGuard } from './User';
 
 Logger.info(ffmpegPath, "FFMPEG path");
 
+
 let innertube : Innertube;
+
+/**
+ * bun and its stupid env/string hardcode compiling is wrecking the import for ffmpeg
+ * so if we dont find it we gotta go look for it
+ * when we are compiled we are flattened to 1 file next to the node_modules folder
+ */
+async function getFFMPEGPath() {
+  const mpegCheck = Bun.file(ffmpegPath || "");
+  const exists = await mpegCheck.exists();
+
+  if (exists) {
+    return ffmpegPath;
+  }
+  Logger.info('looking for ffmpeg');
+  // const lookPath = `${import.meta.dir}./node_modules/ffmpeg-static/ffmpeg`;
+  const lookPath = `./node_modules/ffmpeg-static/ffmpeg`;
+  Logger.info(`Looking for ffmpeg here: ${lookPath}`);
+  const look = Bun.file(lookPath);
+  const lookExists = await look.exists();
+
+  if (lookExists) {
+    return lookPath;
+  }
+  Logger.error('FFMPEG not found', 'ffmpeg');
+  throw new Error('FFMPEG not found, blame Bun');
+}
 
 async function getYT(client_type?: ClientType): Promise<Innertube> {
   // TODO: support testing by returning a mock one
@@ -370,6 +397,7 @@ export class Tube {
 
   async downloadYTVideo(videoID: string, authorID: string) {
     const yt = await getYT();
+    const fPath = await getFFMPEGPath();
     // inspired from
     // https://github.com/imputnet/cobalt/blob/current/src/modules/processing/services/youtube.js
     let format = "h264";
@@ -541,12 +569,11 @@ export class Tube {
   
       ffmpegCmd = ffmpegCmd.concat(codecMatch[format].ffmpegArgs);
       ffmpegCmd.push(combinedFile);
-  
-      Logger.info(`${ffmpegPath} ${ffmpegCmd.join(" ")}`);
+      Logger.info(`${fPath} ${ffmpegCmd.join(" ")}`);
         
       const ffmpegP = new Promise((resolve, reject) => {
         // TODO: ffmpegPath can be null
-        const ffmpegProcess = cp.spawn(ffmpegPath || "", ffmpegCmd,
+        const ffmpegProcess = cp.spawn(fPath || "", ffmpegCmd,
         {
           windowsHide: true,
           stdio: [

@@ -4,8 +4,8 @@
 FROM oven/bun:latest
 RUN mkdir -p /app
 WORKDIR /app
-COPY server/dist .
 COPY server/*.json .
 RUN bun install --production
+COPY server/dist .
 CMD ["bun", "run", "index.js"]
 EXPOSE 3000
