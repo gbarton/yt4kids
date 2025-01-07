@@ -29,7 +29,7 @@
 
     const searchString = '?' + searchParams;
 
-    const res = await fetch('/api/videos/search' + searchString);
+    const res = await fetch('api/videos/search' + searchString);
     if (res.status !== 200) {
       console.log("error");
       data = {
@@ -77,11 +77,11 @@
   {#if data?.videos?.length > 0}
   <VideoCards videos={data.videos} authors={data.authors}>
     <svelte:fragment slot="buttons" let:video>
-      <Button size="xs" slot="buttons" class="w-fit" color="light" href="/#/watch/{video.id}">
+      <Button size="xs" slot="buttons" class="w-fit" color="light" href="#/watch/{video.id}">
         View <ArrowRightOutline class="w-4 h-4 ms-2 text-black" />
       </Button>
       {#if admin}
-      <Button size="xs" slot="buttons" class="w-fit" color="light" href="/#/admin?search={data?.authors[video.authorID].name}">
+      <Button size="xs" slot="buttons" class="w-fit" color="light" href="#/admin?search={data?.authors[video.authorID].name}">
         Search <SearchOutline class="w-4 h-4 ms-2 text-black" />
       </Button>
       {/if}

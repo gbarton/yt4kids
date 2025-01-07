@@ -20,7 +20,7 @@
   let email = '', password = ''
 
   const submit = async () => {
-      const resp = await fetch('/api/user/login', {
+      const resp = await fetch('api/user/login', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({

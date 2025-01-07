@@ -56,7 +56,7 @@
   let queue = getQueue();
 
   async function getQueue() : Promise<YTQueue[]> {
-    const resp = await fetch('/api/ext/queue');
+    const resp = await fetch('api/ext/queue');
     if (!resp.ok) {
       return [];
     }
@@ -67,7 +67,7 @@
 
   async function queueVideo(videoID: string, authorID: string, title: string) {
     console.log("add a video", videoID, authorID);
-    const resp = await secureFetch('/api/ext/queue', {
+    const resp = await secureFetch('api/ext/queue', {
       method: 'POST',
       body: JSON.stringify({videoID, authorID, title}),
       headers: {
@@ -88,7 +88,7 @@
 
   async function addVideo(videoID: string, authorID: string) {
     console.log("add a video", videoID, authorID);
-    const resp = await secureFetch('/api/ext/video', {
+    const resp = await secureFetch('api/ext/video', {
       method: 'POST',
       body: JSON.stringify({videoID, authorID}),
       headers: {
@@ -159,7 +159,7 @@
     }
     const encodedParams = new URLSearchParams(params).toString();
 
-    const res = await secureFetch('/api/ext/search?' + encodedParams, {});
+    const res = await secureFetch('api/ext/search?' + encodedParams, {});
     searching = false;
     if (!res.ok) {
       console.log("error");
@@ -211,7 +211,7 @@
   let modalData = "";
 
   async function getVideoDetails(videoID: string) {
-    const res = await secureFetch('/api/yt/video/' + encodeURIComponent(videoID), {});
+    const res = await secureFetch('api/yt/video/' + encodeURIComponent(videoID), {});
     if (res.ok) {
       // we are converting it to json and back to pretty print it
       const data = await res.json();
@@ -223,7 +223,7 @@
   let selectedQueueItem: string;
 
   async function deleteQueueRecord(queueItem: YTQueue) {
-    const res = await secureFetch("/api/ext/queue", {
+    const res = await secureFetch("api/ext/queue", {
       method: 'DELETE',
       body: JSON.stringify(queueItem),
       headers: {
@@ -234,7 +234,7 @@
   }
 
   async function toggleSkip(queueItem: YTQueue) {
-    const res = await secureFetch(`/api/ext/queue/${queueItem.id}/skip`, {
+    const res = await secureFetch(`api/ext/queue/${queueItem.id}/skip`, {
       method: "POST",
       body: JSON.stringify(queueItem),
       headers: {

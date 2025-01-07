@@ -11,5 +11,6 @@ export default defineConfig({
 	},
 	build: {
 		target: "es2022",
-	}
+	},
+	base: '',	// this creates relative paths vs absolute so sub-prefix nesting works
 })

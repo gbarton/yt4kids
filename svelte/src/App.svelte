@@ -46,18 +46,18 @@
       <span class="block truncate text-sm font-medium">{$user.email}</span>
     </DropdownHeader>
       {#if $user.admin}
-      <DropdownItem href="/#/admin">admin</DropdownItem>
+      <DropdownItem href="#/admin">admin</DropdownItem>
       <DropdownDivider />
       {/if}
     <DropdownItem><Button on:click="{logout}">Sign Out</Button></DropdownItem>
     {:else}
-    <DropdownItem href="/#/login">Login</DropdownItem>
-    <DropdownItem href="/#/register">Register</DropdownItem>
+    <DropdownItem href="#/login">Login</DropdownItem>
+    <DropdownItem href="#/register">Register</DropdownItem>
     {/if}
   </Dropdown>
   <NavUl>
-    <NavLi href="/#/">Home</NavLi>
-    <NavLi href="/#/about">About</NavLi>
+    <NavLi href="#/">Home</NavLi>
+    <NavLi href="#/about">About</NavLi>
     
   </NavUl>
 </Navbar>

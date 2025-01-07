@@ -7,7 +7,7 @@
 
   async function testAuth() {
     authResults = "testing....";
-    const res = await secureFetch('/api/testValid', {
+    const res = await secureFetch('api/testValid', {
       method: 'GET',
     });
     if (res.ok) {

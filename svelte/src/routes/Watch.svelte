@@ -16,7 +16,7 @@
       return;
     }
 
-    const res = await fetch('/api/videos/info/' + params.videoID);
+    const res = await fetch('api/videos/info/' + params.videoID);
     if (!res.ok) {
       return;
     }
@@ -34,7 +34,7 @@
 
 {#if params?.videoID}
 	<Video
-		src="/api/videos/chunk/{params.videoID}"
+		src="api/videos/chunk/{params.videoID}"
     preload="auto"
 		controls
 		crossorigin="anonymous"
