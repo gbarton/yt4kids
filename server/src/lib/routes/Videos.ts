@@ -118,14 +118,14 @@ export const VideoEndpoints = new Elysia({ prefix: '/videos' })
       Logger.info(`range header found!: ${range}`);
       const parts = range.replace(/bytes=/, "").split("-");
       // we use this when there isnt a limit in the range
-      const chunkLimit10MB = 10 * 1048576;
+      const chunkLimit = 10 * 1048576;
       const start = parseInt(parts[0], 10);
       // we will use the range if present
       // we will cap the chunk at 10MB or the end of the file if
       // its under 10MB away
       const end = parts[1]
         ? parseInt(parts[1], 10)
-        : Math.min(start + chunkLimit10MB, fileSize - 1);
+        : Math.min(start + chunkLimit, fileSize - 1);
       const chunksize = (end - start) + 1;
       const responseRange = `bytes ${start}-${end}/${fileSize}`;
       Logger.info(`range set to '${responseRange}'`);
