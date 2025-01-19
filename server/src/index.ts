@@ -17,7 +17,8 @@ const app = new Elysia()
   .use(cors())
   .use(swagger())
   .use(staticPlugin({
-    prefix: "/",
+    assets: 'public/',
+    prefix: '/',
   }))
   .group('/api', (api) => 
     api

@@ -2,10 +2,12 @@
 
 # FROM node:20-alpine
 FROM oven/bun:latest
-RUN mkdir -p /app
+RUN mkdir -p /app/public
 WORKDIR /app
 COPY server/*.json .
 RUN bun install --production
-COPY server/dist .
-CMD ["bun", "run", "index.js"]
+COPY server/src ./src
+COPY svelte/dist ./public/
+# COPY server/dist .
+CMD ["bun", "run", "src/index.ts"]
 EXPOSE 3000
