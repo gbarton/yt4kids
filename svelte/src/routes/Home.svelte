@@ -14,20 +14,42 @@
 
   let admin = false;
 
+  const limit = 20;
+  let offset = 0;
+
   user.subscribe((u) => {
     if (u && u.admin) {
       admin = true;
     }
   });
 
-  async function load() {
+  async function reDownloadThumbnails(videoID: string) {
+    await fetch('api/ext/thumbnails', {
+      method: 'POST',
+      body: JSON.stringify({videoID}),
+      headers: {
+        'content-type': 'application/json',
+      },
+    });
+  }
+
+  async function load(more: boolean = false) {
     const searchParams = getSearchParams($querystring || "");
     options = [];
     searchParams.forEach((val, k) => {
       options.push({ key : k, value: val});
     });
+    
+    let searchString = '?' + searchParams;
 
-    const searchString = '?' + searchParams;
+    // add in limit and offset
+    if (!more) {
+      offset = 0;
+    }
+    if (!searchString.endsWith('?')) {
+      searchString += '&';
+    }
+    searchString += `limit=${limit}&offset=${offset}`;
 
     const res = await fetch('api/videos/search' + searchString);
     if (res.status !== 200) {
@@ -42,8 +64,48 @@
     }
     const items = await res.json();
     console.log(items);
-    // console.log(items.authors['UCK9X9/JACEsonjbqaewUtICA']);
-    data = items as YTSearchResponse;
+    if(more) {
+      console.log(`continuation load offset: ${offset} for ${limit} more`);
+      // merge
+      const newData = items as YTSearchResponse;
+      // marging the videos together
+      data.videos = [
+        ...data.videos.filter(video => !newData.videos.some(newVideo => newVideo.id === video.id)),
+        ...newData.videos
+      ];
+      // data.videos.push(...newData.videos);
+      data.query = newData.query;
+      data.authors = {...data.authors, ...newData.authors};
+    } else {
+      console.log('new search');
+      data = items as YTSearchResponse;
+    }
+  }
+
+  function loadMore(node: Element) {
+    const obs = new IntersectionObserver((entries) => {
+      // I think this only fires once because we are just tied to the window
+      entries.forEach((entry) => {
+        console.log('here');
+        console.log(entry);
+        if (entry.isIntersecting) {
+          console.log('intersection detected');
+          offset += data?.videos?.length || 0;
+          load(true);
+        }
+      });
+    },
+    {
+      // threshold: 0.1 , // 10%
+    });
+
+    obs.observe(node);
+    return {
+      destroy: () => {
+        console.log('destroyed obervable')
+        obs.disconnect();
+      }
+    }
   }
 
   $: {
@@ -61,9 +123,9 @@
   let data : YTSearchResponse;
   console.log("home page log");
 
-  onMount(() => {
-    load();
-  });
+  // onMount(() => {
+  //   load();
+  // });
 
 </script>
 
@@ -84,9 +146,16 @@
       <Button size="xs" slot="buttons" class="w-fit" color="light" href="#/admin?search={data?.authors[video.authorID].name}">
         Search <SearchOutline class="w-4 h-4 ms-2 text-black" />
       </Button>
+      <Button size="xs" class="w-fit" color="light"
+        on:click="{() =>reDownloadThumbnails(video.id)}">
+        Thumbnails
+      </Button>
       {/if}
     </svelte:fragment>
   </VideoCards>
+  <div use:loadMore>
+    ...loading more
+  </div>
   {/if}
 
 </div>

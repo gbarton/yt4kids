@@ -64,6 +64,8 @@ export const YTSearchSchema = t.Object({
   authorID: t.Optional(t.String()),
   search: t.Optional(t.String()),
   channelID: t.Optional(t.String()),
+  limit: t.Optional(t.Number({minimum: 0, maximum: 50})),
+  offset: t.Optional(t.Number({minimum: 0}))
 });
 
 export type YTSearch = typeof YTSearchSchema.static;
@@ -194,6 +196,7 @@ export type QueryOptions = {
   sortByDescending?: boolean,
   sortFunction?: (o1: object, o2: object) => number
   limit?: number,
+  offset?: number,
 }
 
 export interface IDB {

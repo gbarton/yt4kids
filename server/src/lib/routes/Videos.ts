@@ -26,7 +26,9 @@ class Videos {
       // custom sort function because you cant do nested props with simplesort
       sortFunction:  function(o1: any, o2: any) {
         return o1.meta?.created < o2.meta?.created? 1 : -1;
-      }
+      },
+      limit: searchOpts.limit,
+      offset: searchOpts.offset,
     }
   
     if(searchOpts.authorID) {

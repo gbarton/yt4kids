@@ -255,6 +255,7 @@ async function saveThumbnails(authorID: string, tns: Thumbnail[]): Promise<YTThu
     // @ts-ignore
     Readable.fromWeb(imgRes.body).pipe(stream);
     await p;
+
     const contentLength = getFilesizeInBytes(fileName);
     Logger.info(`thumbnail saved to file ${fileName}`);
 
@@ -394,6 +395,32 @@ function addAuthorToList(a: Author, authors: {[key: string]: YTAuthor}) {
 
 export class Tube {
   constructor() {}
+
+  async downloadVideoThumbnails(videoID: string) {
+    const DB = await getDB();
+    const video = await DB.findOne<YTVideoInfo>(RecordTypes.VIDEO, videoID);
+    if(!video) {
+      Logger.warn(`Video not found: ${videoID}`);
+      return;
+    }
+    
+    const yt = await getYT();
+    let info : VideoInfo;
+    try {
+      Logger.info('retrieving video info to update thumbnails');
+      // info = await yt.getInfo(videoID);
+      info = await yt.getBasicInfo(videoID);
+      Logger.info("info retrieved");
+      const tns = await saveThumbnails(video.authorID, info.basic_info.thumbnail || []);
+  
+      video.thumbnails = tns;
+    
+      await DB.insertOrUpdateObj(video);
+    } catch (error) {
+      Logger.error(error);
+      return { error: 'Error Info for video was no good' };
+    }
+  }
 
   async downloadYTVideo(videoID: string, authorID: string) {
     const yt = await getYT();
@@ -802,6 +829,16 @@ export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
   .get('/queue', async ({yt}) => {
     return yt.getQueue();
   })
+  // nore thumbnail redownloading
+  .post('/thumbnails', async ({yt, body: {videoID}}) => {
+    yt.downloadVideoThumbnails(videoID);
+    return 'ok';
+  }, {
+    body: t.Object({
+      videoID: t.String(),
+    })
+  })
+  // enable guard
   .use(adminGuard)
   .get('/search', async ({yt, query}) => {
     const { search, ...rest } = query;
@@ -858,4 +895,4 @@ export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
       authorID: t.String(),
       videoID: t.String(),
     })
-  })
+  });

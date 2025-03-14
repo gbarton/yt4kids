@@ -307,7 +307,6 @@
                 on:click="{() => toggleSkip(q)}">
                 {q.skip ? "Re-queue" : "Skip"}
               </Button>
-
             </span>
             {/if}
           </li>

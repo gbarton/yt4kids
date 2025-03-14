@@ -6,6 +6,7 @@ import path from 'node:path';
 import fs from 'node:fs'
 import * as Utils from '../utils/Utils';
 import { IDB, QueryOptions, RecordTypes, YTRecord } from './Types';
+import Logger from '../Log';
 
 export default class LokiDatabase implements IDB {
   LOC: string;
@@ -191,9 +192,15 @@ export default class LokiDatabase implements IDB {
     if (opts?.sortFunction !== undefined) {
       results = results.sort(opts.sortFunction);
     }
-    if (opts.limit !== undefined) {
-      results = results.limit(opts.limit);
-    }
+    // ! more loki crap not working, need to dumb this for postgres
+    // if (opts.offset !== undefined) {
+    //   Logger.info(`offset set: ${opts.offset}`);
+    //   results.offset(opts.offset);
+    // }
+    // if (opts.limit !== undefined) {
+    //   Logger.info(`limit set: ${opts.limit}`);
+    //   results = results.limit(opts.limit);
+    // }
   
     return results;
   }
@@ -206,7 +213,16 @@ export default class LokiDatabase implements IDB {
   public async find(type: RecordTypes, options: QueryOptions) {
     log.debug(options, `find ${type}`);
     const results = await this.fetch(type, options);
-    return results.data();
+    let data = results.data();
+    if (options.offset !== undefined) {
+      Logger.info(`manual offset set: ${options.offset}`);
+      data = data.slice(options.offset);
+    }
+    if(options.limit !== undefined) {
+      Logger.info(`manual limit set: ${options.limit}`);
+      data = data.slice(0, options.limit);
+    }
+    return data;
   }
   
   /**
@@ -258,10 +274,12 @@ export default class LokiDatabase implements IDB {
     let record = await coll.findOne({ id: json.id });
   
     if (Utils.isNull(record)) {
+      log.debug('inserting ' + obj.recordType);
       record = json;
       await coll.insert(record);
       log.debug(`inserted ${obj.recordType}: ${record.id}`);
     } else {
+      log.debug(record, 'updating ' + obj.recordType);
       // update the existing record with new fields
       Object.assign(record, json);
       await coll.update(record);
