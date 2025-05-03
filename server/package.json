@@ -2,27 +2,36 @@
   "name": "server",
   "version": "1.0.50",
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target=bun",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "build": "bun build ./src/index.ts --outdir ./dist --target=bun --env=disable",
+    "dev": "LOG_LEVEL=INFO TESTCONTAINERS_RYUK_DISABLED=true bun run src/devServer.ts",
+    "test": "TESTCONTAINERS_RYUK_DISABLED=true bun test --coverage",
+    "schema": "drizzle-kit generate"
   },
   "dependencies": {
     "@bogeychan/elysia-logger": "^0.1.8",
     "@elysiajs/cors": "^1.2.0",
     "@elysiajs/cron": "^1.2.0",
+    "@elysiajs/eden": "^1.2.0",
     "@elysiajs/jwt": "^1.2.0",
     "@elysiajs/static": "^1.2.0",
     "@elysiajs/stream": "^1.1.0",
     "@elysiajs/swagger": "^1.2.2",
     "@types/lokijs": "^1.5.14",
-    "elysia": "^1.2.18",
+    "dotenv": "^16.5.0",
+    "drizzle-kit": "^0.30.6",
+    "drizzle-orm": "^0.41.0",
+    "drizzle-typebox": "^0.3.2",
+    "elysia": "^1.2.25",
     "ffmpeg-static": "^5.2.0",
     "lokijs": "^1.5.12",
+    "pg": "^8.15.6",
     "uuid": "^11.1.0",
-    "youtubei.js": "^13.0.0"
+    "youtubei.js": "^13.4.0"
   },
   "devDependencies": {
-    "bun-types": "^1.2.2"
+    "@testcontainers/postgresql": "^10.24.2",
+    "@types/bun": "latest",
+    "testcontainers": "^10.24.2"
   },
   "module": "src/index.js"
 }

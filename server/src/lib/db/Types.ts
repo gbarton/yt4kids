@@ -1,4 +1,5 @@
 import { t } from 'elysia';
+import { authorSchema, videoSchema } from '../../db/schema';
 
 // EXTERNAL ONES FOR YT LIB
 
@@ -61,11 +62,11 @@ export type YTRecord = typeof YTRecordSchema.static;
 
 
 export const YTSearchSchema = t.Object({
-  authorID: t.Optional(t.String()),
+  authorId: t.Optional(t.String()),
   search: t.Optional(t.String()),
-  channelID: t.Optional(t.String()),
-  limit: t.Optional(t.Number({minimum: 0, maximum: 50})),
-  offset: t.Optional(t.Number({minimum: 0}))
+  channelId: t.Optional(t.String()),
+  limit: t.Number({minimum: 0, maximum: 50, default: 20}),
+  offset: t.Number({minimum: 0, default: 0})
 });
 
 export type YTSearch = typeof YTSearchSchema.static;
@@ -74,114 +75,143 @@ export type YTSearch = typeof YTSearchSchema.static;
 /**
  * User management
  */
-export interface YTProfile extends YTRecord {
-  displayName: string,
-  email: string,
-  admin: boolean,
-}
+// export interface YTProfile extends YTRecord {
+//   displayName: string,
+//   email: string,
+//   admin: boolean,
+// }
 
-export interface YTPassword extends YTRecord {
-  pwHash: string
-}
+// export interface YTPassword extends YTRecord {
+//   pwHash: string
+// }
 
-export interface YTQueue extends YTRecord {
-  authorID: string,
-  title: string,
-  complete: boolean,
-  requestedDate: Date,
-  attempts: number,
-  skip: boolean,
-}
+// export interface YTQueue extends YTRecord {
+//   authorID: string,
+//   title: string,
+//   complete: boolean,
+//   requestedDate: Date,
+//   attempts: number,
+//   skip: boolean,
+// }
 
-export const YTThumbnailSchema = t.Object({
+// export const YTThumbnailSchema = t.Object({
+//   id: t.String(),
+//   url: t.Optional(t.String()),
+//   width: t.Number(),
+//   height: t.Number(),
+//   fileID: t.Optional(t.String()),
+//   size: t.Union([t.Literal('tiny'),t.Literal('small'),t.Literal('medium'),t.Literal('large'),t.Literal('xlarge')])
+// });
+
+// export type YTThumbnail = typeof YTThumbnailSchema.static;
+
+// export const YTBannedSchema = t.Object({
+//   date: t.Date(),
+//   by: t.String(),
+//   reason: t.String(),
+// });
+
+// /**
+//  * Used for videos and channels when content is deemed no good
+//  */
+// export type YTBanned = typeof YTBannedSchema;
+
+
+// /**
+//  * used on videos and channels
+//  */
+// export const YTAuthorSchema = t.Composite([
+//   YTRecordSchema,
+//   t.Object({
+//     name: t.String(),
+//     url: t.String(),
+//     thumbnails: t.Array(YTThumbnailSchema),
+//   })
+// ])
+
+// export type YTAuthor = typeof YTAuthorSchema.static;
+
+// export const YTChannelInfoSchema = t.Composite([
+//   YTRecordSchema,
+//   t.Object({
+//     name: t.String(),
+//     authorID: t.String(),
+//     videoIDs: t.Array(t.String()),
+//     stayUpdated: t.Boolean({ default: false}),
+//     banned: t.Optional(YTBannedSchema),
+//   })
+// ])
+
+// /**
+//  * record that holds our channel information
+//  */
+// export type YTChannelInfo = typeof YTChannelInfoSchema.static;
+
+
+// export const YTFileSchema = t.Composite([
+//   YTRecordSchema,
+//   t.Object({
+//     fileExtention: t.String(),
+//     filename: t.String(),
+//     authorID: t.String(),
+//     contentLength: t.Number(),
+//   })
+// ])
+
+// export type YTFile = typeof YTFileSchema.static;
+
+// export const YTVideoInfoSchema = t.Composite([
+//   YTRecordSchema,
+//   t.Object({
+//     title: t.String(),
+//     thumbnails: t.Array(YTThumbnailSchema),
+//     authorID: t.String(),
+//     durationText: t.String(),
+//     durationSeconds: t.Number(),
+//     fileID: t.Optional(t.String()),
+//     quality: t.Optional(t.String()),
+//     format: t.Optional(t.String()),
+//     banned: t.Optional(YTBannedSchema),
+//   })
+// ])
+
+// export type YTVideoInfo = typeof YTVideoInfoSchema.static;
+
+// export const YTSearchResponseSchema = t.Object({
+//   query: t.String(),
+//   channels: t.Array(YTChannelInfoSchema),
+//   videos: t.Array(YTVideoInfoSchema),
+//   authors: t.Record(t.String(), YTAuthorSchema),
+// })
+
+// export type YTSearchResponse = typeof YTSearchResponseSchema.static;
+
+export const YTExtThumbnailSchema = t.Object({
+  width: t.Integer(),
+  height: t.Integer(),
+  url: t.String(),
+  size: t.String(),
+});
+
+export type YTExtThumbnail = typeof YTExtThumbnailSchema.static;
+
+export const YTExtVideoSchema = t.Object({
   id: t.String(),
-  url: t.Optional(t.String()),
-  width: t.Number(),
-  height: t.Number(),
-  fileID: t.Optional(t.String()),
-  size: t.Union([t.Literal('tiny'),t.Literal('small'),t.Literal('medium'),t.Literal('large'),t.Literal('xlarge')])
+  title: t.String(),
+  downloaded: t.Boolean(),
+  authorId: t.String(),
+  authorName: t.String(),
+  authorThumbnails: t.Array(YTExtThumbnailSchema),
+  thumbnails: t.Array(YTExtThumbnailSchema),
 });
 
-export type YTThumbnail = typeof YTThumbnailSchema.static;
-
-export const YTBannedSchema = t.Object({
-  date: t.Date(),
-  by: t.String(),
-  reason: t.String(),
-});
-
-/**
- * Used for videos and channels when content is deemed no good
- */
-export type YTBanned = typeof YTBannedSchema;
-
-
-/**
- * used on videos and channels
- */
-export const YTAuthorSchema = t.Composite([
-  YTRecordSchema,
-  t.Object({
-    name: t.String(),
-    url: t.String(),
-    thumbnails: t.Array(YTThumbnailSchema),
-  })
-])
-
-export type YTAuthor = typeof YTAuthorSchema.static;
-
-export const YTChannelInfoSchema = t.Composite([
-  YTRecordSchema,
-  t.Object({
-    name: t.String(),
-    authorID: t.String(),
-    videoIDs: t.Array(t.String()),
-    stayUpdated: t.Boolean({ default: false}),
-    banned: t.Optional(YTBannedSchema),
-  })
-])
-
-/**
- * record that holds our channel information
- */
-export type YTChannelInfo = typeof YTChannelInfoSchema.static;
-
-
-export const YTFileSchema = t.Composite([
-  YTRecordSchema,
-  t.Object({
-    fileExtention: t.String(),
-    filename: t.String(),
-    authorID: t.String(),
-    contentLength: t.Number(),
-  })
-])
-
-export type YTFile = typeof YTFileSchema.static;
-
-export const YTVideoInfoSchema = t.Composite([
-  YTRecordSchema,
-  t.Object({
-    title: t.String(),
-    thumbnails: t.Array(YTThumbnailSchema),
-    authorID: t.String(),
-    durationText: t.String(),
-    durationSeconds: t.Number(),
-    fileID: t.Optional(t.String()),
-    quality: t.Optional(t.String()),
-    format: t.Optional(t.String()),
-    banned: t.Optional(YTBannedSchema),
-  })
-])
-
-export type YTVideoInfo = typeof YTVideoInfoSchema.static;
+export type YTExtVideo = typeof YTExtVideoSchema.static;
 
 export const YTSearchResponseSchema = t.Object({
   query: t.String(),
-  channels: t.Array(YTChannelInfoSchema),
-  videos: t.Array(YTVideoInfoSchema),
-  authors: t.Record(t.String(), YTAuthorSchema),
-})
+  videos: t.Array(videoSchema),
+  authors: t.Record(t.String(), authorSchema),
+});
 
 export type YTSearchResponse = typeof YTSearchResponseSchema.static;
 

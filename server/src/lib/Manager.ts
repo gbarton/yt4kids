@@ -1,5 +1,6 @@
 import Logger from "./Log";
 import { Tube } from "./routes/YT";
+import { Queues } from "./routes/Queues";
 
 export default class Manager {
   // our one and only copy
@@ -8,9 +9,11 @@ export default class Manager {
   private interval: number = 300000;
   private timer : NodeJS.Timer;
   private running: Boolean = false;
+  private title: string = '';
   private skipAfter: number = 10;
 
   private yt: Tube;
+  private queues: Queues;
 
   private constructor() {
     if (Bun.env.YT_DOWNLOAD_INTERVAL) {
@@ -26,6 +29,7 @@ export default class Manager {
     },
     this.interval);
     this.yt = new Tube();
+    this.queues = new Queues();
   }
 
   public static getInstance(): Manager {
@@ -38,7 +42,7 @@ export default class Manager {
 
   private async downloadVideos() {
     this.running = true;
-    const q = await this.yt.getNextQueuedDL();
+    const q = await this.queues.getNextInQueue();
     // no work to do
     if (!q) {
       this.running = false;
@@ -46,8 +50,9 @@ export default class Manager {
     }
 
     Logger.info(q, 'next to dl');
+    this.title = q.title;
 
-    const obj = await this.yt.downloadYTVideo(q.id, q.authorID).catch((err) => {
+    const obj = await this.yt.downloadYTVideo(q.id, q.authorId).catch((err) => {
       Logger.warn(`unable to download video: ${q.id}`);
       Logger.error(err);
       return { error: "yup" };
@@ -62,13 +67,15 @@ export default class Manager {
       }
     }
 
-    await this.yt.updateQueue(q);
+    await this.queues.updateQueue(q.id, q);
+    Logger.info(`manager done with: '${this.title}', sleeping`);
 
     // SUPER lame way to force it to wait a while longer
     const that = this;
     setTimeout(() => {
       Logger.info("manager free");
       that.running = false;
+      this.title = '';
     }, this.interval);
   }
 
@@ -79,7 +86,7 @@ export default class Manager {
     if (!this.running) {
       this.downloadVideos();
     } else {
-      Logger.info('manager already busy');
+      Logger.info(`manager already busy with: '${this.title}'`);
     }
   }
 }

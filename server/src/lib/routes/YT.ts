@@ -1,9 +1,6 @@
 import { Elysia, t } from 'elysia'
 import Logger from '../Log';
-import getDB from '../db/DB';
-
-
-
+import { authorSchema, type Author, type AuthorInsert, type Thumbnail, type ThumbnailInsert, type Video, type VideoInsert } from '../../db/schema';
 
 // TODO: stop using sync!
 import { createWriteStream, existsSync, mkdirSync, statSync } from 'fs';
@@ -11,22 +8,24 @@ import { rename, rm } from 'node:fs/promises';
 import { ClientType, Innertube, Utils as YTTools } from 'youtubei.js';
 import * as Utils from '../utils/Utils';
 
-import { RecordTypes, RecordTypesSchema, SearchOptions, SearchOptionsSchema, YTAuthor, YTChannelInfo, YTFile, YTQueue, YTSearchResponse, YTSearchResponseSchema, YTThumbnail, YTVideoInfo } from "../db/Types";
+// import { RecordTypes, RecordTypesSchema, SearchOptions, SearchOptionsSchema, YTAuthor, YTChannelInfo, YTFile, YTQueue, YTSearchResponse, YTSearchResponseSchema, YTThumbnail, YTVideoInfo } from "../db/Types";
+
+import { type SearchOptions, SearchOptionsSchema, YTExtThumbnail, YTExtVideo, YTExtVideoSchema, type YTSearchResponse, YTSearchResponseSchema } from "../db/Types";
 
 import crypto from 'crypto';
 import cp from 'child_process';
 import ffmpegPath  from 'ffmpeg-static';
-import { DownloadOptions } from "youtubei.js/dist/src/types";
-import { VideoInfo } from "youtubei.js/dist/src/parser/youtube";
-import { Author, Format, Thumbnail } from "youtubei.js/dist/src/parser/misc";
-import { Video } from "youtubei.js/dist/src/parser/nodes";
+import { DownloadOptions } from 'youtubei.js/dist/src/types';
+import { VideoInfo as YTIVideoInfo } from "youtubei.js/dist/src/parser/youtube";
+import { Author as YTIAuthor, Format as YTIFormat, Thumbnail as YTIThumbnail } from "youtubei.js/dist/src/parser/misc";
+import { Video as YTIVideo } from "youtubei.js/dist/src/parser/nodes";
 import { Readable } from "stream";
 import { adminGuard } from './User';
+import { Authors } from './Authors';
+import { Thumbnails } from './Thumbnails';
+import { Videos } from './Videos';
 
 Logger.info(ffmpegPath, "FFMPEG path");
-
-
-let innertube : Innertube;
 
 /**
  * bun and its stupid env/string hardcode compiling is wrecking the import for ffmpeg
@@ -101,7 +100,7 @@ function fileSafeStr(s: string) {
   return cleanString(s).replaceAll(/[\s.]/g, '_');
 }
 
-function makeDir(type: RecordTypes, authorId: string): string {
+function makeDir(type: "VIDEO" | "THUMBNAIL", authorId: string): string {
   let dir = `${getStorageDir()}/${type}/${fileSafeStr(authorId)}`;
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true});
@@ -111,12 +110,12 @@ function makeDir(type: RecordTypes, authorId: string): string {
 }
 
 function thumbnailStoragePath(authorId: string, id: string, fileExtention: string = 'jpeg') {
-  const dir = makeDir(RecordTypes.THUMBNAIL_FILE, authorId);
+  const dir = makeDir("THUMBNAIL", authorId);
   return `${dir}/${fileSafeStr(id)}.${fileExtention}`;
 }
 
 function videoStoragePath(authorId: string, title: string, fileExtention: string = 'mp4'): string {
-  const dir = makeDir(RecordTypes.VIDEO_FILE, authorId);
+  const dir = makeDir("VIDEO", authorId);
   return `${dir}/${fileSafeStr(title.trim())}.${fileExtention}`;
 }
 
@@ -159,7 +158,7 @@ type DLOpts = DownloadOptions & DLExtraOpts;
  */
 // TODO: something in here calls acorn and explodes
 async function download(id: string, dlObj: DLOpts, path: string) {
-  Logger.info(dlObj, "Download Options");
+  Logger.debug(dlObj, "Download Options");
   const yt = await getYT(ClientType.TV);
  
   const stream = await Utils.cancellable<ReadableStream<Uint8Array>>(() => yt.download(id, dlObj), 5000);
@@ -213,84 +212,6 @@ async function download(id: string, dlObj: DLOpts, path: string) {
   }
 }
 
-/**
- * Download thumbnails for a given author
- * @param authorID id of who we are saving
- * @param tns thumbnails
- * @returns 
- */
-async function saveThumbnails(authorID: string, tns: Thumbnail[]): Promise<YTThumbnail[]> {
-  // pull down thumbnails
-  // TODO: need to do some retry logic
-  const promises = tns.map((t):Promise<YTThumbnail> => new Promise(async (resolve, reject) => {
-    // some of yt's urls dont have http/https and just start at //
-    const urlStr = t.url.startsWith('//') ? `http:${t.url}` : t.url;
-    const imgRes = await fetch(urlStr);
-    if (!imgRes.ok || imgRes.body === null) {
-      Logger.warn(imgRes.status, `unable to fetch url: ${urlStr}`);
-      return reject(`fetch failed for url: ${urlStr}`);
-    }
-    const url = new URL(urlStr);
-    const fileId = cleanString(url.pathname);
-    const fileName = thumbnailStoragePath(authorID, fileId);
-    const stream = createWriteStream(fileName);
-    // setup listeners
-    const p = new Promise((resolve, reject) => {
-      stream.on('end', () => {
-        Logger.info('thumbnail end');
-        resolve(fileName);
-      });
-      stream.on('close', () => {
-        Logger.info('thumbnail close');
-        resolve(fileName);
-      });
-      stream.on('error', (err) => {
-        Logger.error(err);
-        Logger.error(`broke streaming thumbnail: ${urlStr}`);
-        reject(fileName);
-      });
-    })
-    // write the file
-    // TODO: figure out what this is complaining about
-    // @ts-ignore
-    Readable.fromWeb(imgRes.body).pipe(stream);
-    await p;
-
-    const contentLength = getFilesizeInBytes(fileName);
-    Logger.info(`thumbnail saved to file ${fileName}`);
-
-    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
-    const tFile : YTFile = {
-      fileExtention: contentType?.substring(contentType.indexOf('/') + 1),
-      filename: fileName,
-      authorID: authorID,
-      contentLength,
-      id: fileId,
-      recordType: RecordTypes.THUMBNAIL_FILE,
-    }
-    // log.info(tFile);
-    const DB = await getDB();
-  
-    // save file record
-    await DB.insertOrUpdateObj(tFile);
-    Logger.info('saved file record');
-    // return thumbnail record
-    const tn: YTThumbnail = {
-      id: fileId,
-      fileID: fileId,
-      width: t.width,
-      height: t.height,
-      size: widthToSize(t.width),
-    }
-    resolve(tn);
-  }));
-
-  // save all thumbnails
-  const ts = await Promise.all(promises).catch((err) => { Logger.error("issue saving thumbnails"); return []});
-  Logger.info('all thumbnails saved');
-  return ts;
-}
-
 type CodecDetails = {
   codec: string,
   aCodec: string,
@@ -336,93 +257,139 @@ function widthToSize(w: number) {
   return 'tiny';
 }
 
-function convertThumbnails(thumbnails : Thumbnail[]): YTThumbnail[] {
-  return thumbnails.map((t) => (
-    {
-      id: t.url,
-      width: t.width,
-      height: t.height,
-      url: t.url,
-      size: widthToSize(t.width),
-    }
-  ));
-}
 
-async function saveAuthors(author: Author) {
-  const DB = await getDB();
-  const aRecord = await DB.findOne<YTAuthor>(RecordTypes.AUTHOR, author.id);
-  if (aRecord) {
-    Logger.info(`already have author: ${author.id}`);
-    return;
-  }
-  // pull down thumbnails
-  const tns = await saveThumbnails(author.id, author.thumbnails);
-
-  // insert author
-  const a : YTAuthor = {
-    name: author.name,
-    url: author.url,
-    thumbnails: tns,
-    id: author.id,
-    recordType: RecordTypes.AUTHOR,
-  }
-  await DB.insertOrUpdateObj(a);
-  Logger.info(`author saved ${a.id}`);
-}
-
-function createAuthor(a: Author): YTAuthor {
-  const author: YTAuthor = {
-    recordType: RecordTypes.AUTHOR,
-    id: a.id,
-    name: a.name,
-    url: "",
-    thumbnails: convertThumbnails(a.thumbnails),
-  }
-  return author;
-}
-
-// TODO: should we pull our versions?
-function addAuthorToList(a: Author, authors: {[key: string]: YTAuthor}) {
-  // log.info(`author check for '${a.id}'`);
-  if (authors[a.id]) {
-    return;
-  }
-  const author = createAuthor(a);
-  authors[a.id] = author;
-  saveAuthors(a);
-}
 
 
 export class Tube {
-  constructor() {}
+  private authors: Authors;
+  private thumbnails: Thumbnails;
+  private videos: Videos;
 
-  async downloadVideoThumbnails(videoID: string) {
-    const DB = await getDB();
-    const video = await DB.findOne<YTVideoInfo>(RecordTypes.VIDEO, videoID);
+  constructor() {
+    this.authors = new Authors();
+    this.thumbnails = new Thumbnails();
+    this.videos = new Videos();
+  }
+
+    /**
+   * Download thumbnails for a given author
+   * @param authorID id of who we are saving
+   * @param tns thumbnails
+   * @returns 
+   */
+  async saveThumbnails(authorId: string, tns: YTIThumbnail[], videoId?: string): Promise<void> {
+    // pull down thumbnails
+    // TODO: need to do some retry logic
+    const promises = tns.map((t): Promise<void> => new Promise(async (resolve, reject) => {
+      // some of yt's urls dont have http/https and just start at //
+      const urlStr = t.url.startsWith('//') ? `http:${t.url}` : t.url;
+      const imgRes = await fetch(urlStr);
+      if (!imgRes.ok || imgRes.body === null) {
+        Logger.warn(imgRes.status, `unable to fetch url: ${urlStr}`);
+        return reject(`fetch failed for url: ${urlStr}`);
+      }
+      const url = new URL(urlStr);
+      const fileId = cleanString(url.pathname);
+      const fileName = thumbnailStoragePath(authorId, fileId);
+      const stream = createWriteStream(fileName);
+      // setup listeners
+      const p = new Promise((resolve, reject) => {
+        stream.on('end', () => {
+          Logger.info('thumbnail end');
+          resolve(fileName);
+        });
+        stream.on('close', () => {
+          Logger.info('thumbnail close');
+          resolve(fileName);
+        });
+        stream.on('error', (err) => {
+          Logger.error(err);
+          Logger.error(`broke streaming thumbnail: ${urlStr}`);
+          reject(fileName);
+        });
+      })
+      // write the file
+      // TODO: figure out what this is complaining about
+      // @ts-ignore
+      Readable.fromWeb(imgRes.body).pipe(stream);
+      await p;
+
+      const contentLength = getFilesizeInBytes(fileName);
+      Logger.info(`thumbnail saved to file ${fileName}`);
+
+      const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+      const thumbnail : ThumbnailInsert = {
+        fileExtention: contentType?.substring(contentType.indexOf('/') + 1),
+        filename: fileName,
+        authorId: authorId,
+        contentLength,
+        id: fileId,
+        width: t.width,
+        height: t.height,
+        size: widthToSize(t.width),
+      }
+
+      await this.thumbnails.insertThumbnails([thumbnail], videoId);
+      Logger.info('saved thumbnail record');
+
+      resolve();
+    }));
+
+  // save all thumbnails
+  await Promise.all(promises).catch((err) => { Logger.error(err, "issue saving thumbnails"); return []});
+  Logger.info('all thumbnails saved');
+  return;
+}
+
+  // ? should we pull our versions?
+  async addAuthorToList(a: YTIAuthor, authors: {[key: string]: Author}) {
+    Logger.debug(`check new author list for '${a.id}'`);
+    if (authors[a.id]) {
+      return;
+    }
+    const author: AuthorInsert = {
+      id: a.id,
+      name: a.name,
+      url: "", // TODO: populate?
+      // thumbnails: convertThumbnails(a.thumbnails),
+    }
+    let newAuthor = await this.authors.getAuthor(a.id);
+    if(newAuthor == null) {
+      newAuthor = await this.authors.insertAuthor(author);
+    }
+    authors[newAuthor.id] = newAuthor;
+    // now save their thumbnails out of band
+    try {
+      await this.saveThumbnails(newAuthor.id, a.thumbnails);
+    } catch(err) {
+      Logger.error(err, `blew up saving thumbnails for author: ${a.id}`);
+    }
+  }
+
+  async downloadVideoThumbnails(videoId: string) {
+    const video = await this.videos.getVideo(videoId);
     if(!video) {
-      Logger.warn(`Video not found: ${videoID}`);
+      Logger.warn(`Video not found: ${videoId}`);
       return;
     }
     
     const yt = await getYT();
-    let info : VideoInfo;
+    let info : YTIVideoInfo;
     try {
       Logger.info('retrieving video info to update thumbnails');
       // info = await yt.getInfo(videoID);
-      info = await yt.getBasicInfo(videoID);
+      info = await yt.getBasicInfo(videoId);
       Logger.info("info retrieved");
-      const tns = await saveThumbnails(video.authorID, info.basic_info.thumbnail || []);
-  
-      video.thumbnails = tns;
-    
-      await DB.insertOrUpdateObj(video);
+      if (info.basic_info.thumbnail != undefined && info.basic_info.thumbnail?.length > 0) {
+        const tns = await this.saveThumbnails(video.authorId, info.basic_info.thumbnail);
+      }
     } catch (error) {
       Logger.error(error);
-      return { error: 'Error Info for video was no good' };
+      return { error: 'Error: Info for video was no good for finding thumbnails' };
     }
   }
 
-  async downloadYTVideo(videoID: string, authorID: string) {
+  async downloadYTVideo(videoId: string, authorId: string) {
     const yt = await getYT();
     const fPath = await getFFMPEGPath();
     // inspired from
@@ -449,10 +416,10 @@ export class Tube {
       }
     }
   
-    let info : VideoInfo;
+    let info : YTIVideoInfo;
     try {
       Logger.info('retrieving video info');
-      info = await yt.getBasicInfo(videoID);
+      info = await yt.getBasicInfo(videoId);
       Logger.info("info retrieved");
   
     } catch (error) {
@@ -469,7 +436,7 @@ export class Tube {
   
     // return a critical error if returned video is "Video Not Available"
     // or a similar stub by youtube
-    if (info.basic_info.id !== videoID) {
+    if (info.basic_info.id !== videoId) {
         return {
             error: 'ErrorCantConnectToServiceAPI'
         }
@@ -481,13 +448,14 @@ export class Tube {
     let videoQuality: string;
     let hasAudio: boolean = false;
     const { title, author } = info.basic_info;
+    Logger.debug(info.basic_info);
   
     if (!title || !author) {
       return { error: 'Missing title/author info for video'};
     }
   
     // remove formats that we dont want from the list
-    const filterByCodec = (formats: Format[] ) => formats.filter(e => 
+    const filterByCodec = (formats: YTIFormat[] ) => formats.filter(e => 
       e.mime_type.includes(codecMatch[format].codec) || e.mime_type.includes(codecMatch[format].aCodec)
     ).sort((a, b) => Number(b.bitrate) - Number(a.bitrate));
   
@@ -536,12 +504,12 @@ export class Tube {
     const tmpVideoFile = tmpFilePath();
     let finalTmpFile = tmpVideoFile;
     // TODO: wrap in retry logic!
-    await download(videoID, dlObj, tmpVideoFile);
+    await download(videoId, dlObj, tmpVideoFile);
   
     if (!hasAudio) {
       const filteredAudioFormats = adaptiveFormats.filter((i) => i.has_audio)
       .sort((a, b) => Number(b.bitrate) - Number(a.bitrate));
-      Logger.info(filteredAudioFormats.map((f) => (printAdaptiveFormat(f))), "Filtered Audio Formats");
+      Logger.debug(filteredAudioFormats.map((f) => (printAdaptiveFormat(f))), "Filtered Audio Formats");
       const bestAudioFormat = filteredAudioFormats.find((i) => i.has_audio && i.content_length);
   
       if (!bestAudioFormat || bestAudioFormat === null) {
@@ -563,7 +531,7 @@ export class Tube {
       while (i < 3) {
         Logger.info(`Attempting audio dl try: ${i}`);
         try {
-          await download(videoID, dlObj, tmpAudioFile);
+          await download(videoId, dlObj, tmpAudioFile);
           i = 3;
         } catch (err) {
           i += 1;
@@ -630,42 +598,44 @@ export class Tube {
       // cleanup tmp video file since we combined it
       rm(tmpVideoFile);
     }
+
+    const finalFileName = videoStoragePath(authorId, title);
   
-    let fileInfo : YTFile = {
-      fileExtention: codecMatch[format].fileExtention,
-      filename: videoStoragePath(authorID, title),
-      authorID,
-      contentLength: getFilesizeInBytes(finalTmpFile),
-      id: videoID,
-      recordType: RecordTypes.VIDEO_FILE,
-    }
-  
-    await rename(finalTmpFile, fileInfo.filename);
-    Logger.info(`File Moved: ${finalTmpFile} to ${fileInfo.filename}`);
-    Logger.info(fileInfo, 'File Info');
-  
-    const DB = await getDB();
-    await DB.insertOrUpdateObj(fileInfo);
-  
-    const tns = await saveThumbnails(authorID, info.basic_info.thumbnail || []);
-  
-    const videoRecord: YTVideoInfo = {
+    await rename(finalTmpFile, finalFileName);
+    Logger.info(`File Moved: ${finalTmpFile} to ${finalFileName}`);
+    const writtenFile = Bun.file(finalFileName);
+    Logger.debug(`final file size: ${writtenFile.size}`);
+
+    const videoRecord: VideoInsert = {
       title,
-      thumbnails: tns,
-      authorID,
+      authorId,
       durationText: `${info.basic_info.duration}`,
       durationSeconds: info.basic_info.duration || 0,
-      id: videoID,
-      recordType: RecordTypes.VIDEO,
+      id: videoId,
+      fileExtention: codecMatch[format].fileExtention,
+      filename: finalFileName,
+      contentLength: writtenFile.size,
     }
   
-    await DB.insertOrUpdateObj(videoRecord);
+    await this.videos.insertVideo(videoRecord);
+    await this.saveThumbnails(authorId, info.basic_info.thumbnail || [], videoId);
   
-    return { videoId: videoID, authorID }
+    return { videoId, authorId }
   }
   
 
-  async search(query: string, opts : SearchOptions): Promise<YTSearchResponse> {
+  convertSearchThumbnails(thumbnails : YTIThumbnail[]): YTExtThumbnail[] {
+    return thumbnails.map((t) => (
+      {
+        width: t.width,
+        height: t.height,
+        url: t.url,
+        size: widthToSize(t.width),
+      }
+    ));
+  }
+
+  async search(query: string, opts : SearchOptions): Promise<YTExtVideo[]> {
     Logger.info({query, opts}, "YT Search");
     let results = await (await getYT()).search(query, opts);
   
@@ -675,174 +645,212 @@ export class Tube {
         results = await results.getContinuation();
       }
     }
-  
-    const DB = await getDB();
-  
-    // parse results
-    const sr : YTSearchResponse = {
-      query,
-      videos: [],
-      channels: [],
-      authors: {},
-    }
-  
-    if (results?.results?.length !== undefined && results.results.length  > 0) {
+
+    const videos: YTExtVideo[] = [];
+
+    if(results?.results?.length > 0) {
       const vids = results.videos;
       for (let i = 0; i < vids.length; i += 1) {
         const v = vids[i];
         if (v.type === 'Video') {
-          const vid = v as Video;
-          const videoResult : YTVideoInfo = {
-            title: vid.title.toString(),
-            thumbnails: convertThumbnails(vid.thumbnails),
-            authorID: vid.author.id,
-            durationText: vid.duration.text,
-            durationSeconds: vid.duration.seconds,
-            // fileID: "",
-            id: vid.id,
-            recordType: RecordTypes.VIDEO,
-          }
-          sr.videos.push(videoResult);
-          addAuthorToList(vid.author, sr.authors);
-        }
-      }
-  
-      const channels = results.channels;
-      for (let i = 0; i < channels.length; i += 1) {
-        const c = channels[i];
-        const chanResult : YTChannelInfo = {
-          // @ts-ignore
-          name: c["description_snippet"]?.text || "UNKNOWN",
-          authorID: c.author.id,
-          videoIDs: [],
-          stayUpdated: false,
-          id: c.id,
-          recordType: RecordTypes.CHANNEL,
-        }
-        sr.channels.push(chanResult);
-        addAuthorToList(c.author, sr.authors);
-      }
-    }
-  
-    // add fileID's for all the videos we have, add fake ones for queued ones
-    const lookups = sr.videos.map((v) => {
-      return new Promise(async (resolve) => {
-        const file = await DB.findOne<YTFile>(RecordTypes.VIDEO_FILE, v.id)
-          .catch(() => resolve(true));
-        if (file) {
-          v.fileID = file.id;
-        } else {
-          const queue = await DB.findOne<YTQueue>(RecordTypes.DL_QUEUE, v.id);
-          if (queue) {
-            v.fileID = "In Queue";
+          const vid = v as YTIVideo;
+          const has = await this.videos.getVideo(vid.id);
+          
+          // Check if video already exists in the array and skip if so
+          if (!videos.some(video => video.id === vid.id)) {
+            videos.push({
+              id: vid.id,
+              authorId: vid.author.id,
+              authorName: vid.author.name,
+              downloaded: has != null ? true : false,
+              authorThumbnails: this.convertSearchThumbnails(vid.author.thumbnails),
+              title: vid.title.toString(),
+              thumbnails: this.convertSearchThumbnails(vid.thumbnails),
+            });
           }
         }
-        resolve(true);
-      });
-    });
+      }
+    };
+
+    return videos;
+
+    // parse results
+    // const sr : YTSearchResponse = {
+    //   query,
+    //   videos: [],
+    //   authors: {},
+    // }
   
-    await Promise.all(lookups);
+    // if (results?.results?.length !== undefined && results.results.length  > 0) {
+    //   try {
+    //     const vids = results.videos;
+    //     for (let i = 0; i < vids.length; i += 1) {
+    //       const v = vids[i];
+    //       if (v.type === 'Video') {
+    //         const vid = v as YTIVideo;
+    //         const videoResult : Video = {
+    //           title: vid.title.toString(),
+    //           // thumbnails: convertThumbnails(vid.thumbnails),
+    //           authorId: vid.author.id,
+    //           durationText: vid.duration.text,
+    //           durationSeconds: vid.duration.seconds,
+    //           id: vid.id,
+    //           fileExtention: null,
+    //           filename: null,
+    //           contentLength: null,
+    //           quality: null,
+    //           format: null
+    //         }
+    //         sr.videos.push(videoResult);
+    //         await this.addAuthorToList(vid.author, sr.authors);
+    //       }
+    //     }
+    //   } catch(err) {
+    //     Logger.error(err, 'failed searching YT');
+    //   }
   
-    return sr;
+    //   // const channels = results.channels;
+    //   // for (let i = 0; i < channels.length; i += 1) {
+    //   //   const c = channels[i];
+    //   //   const chanResult : YTChannelInfo = {
+    //   //     // @ts-ignore
+    //   //     name: c["description_snippet"]?.text || "UNKNOWN",
+    //   //     authorID: c.author.id,
+    //   //     videoIDs: [],
+    //   //     stayUpdated: false,
+    //   //     id: c.id,
+    //   //     recordType: RecordTypes.CHANNEL,
+    //   //   }
+    //   //   sr.channels.push(chanResult);
+    //   //   addAuthorToList(c.author, sr.authors);
+    //   // }
+    // }
+  
+    // // add fileID's for all the videos we have, add fake ones for queued ones
+    // // ? not sure why I was doing this anymore
+    // // const lookups = sr.videos.map((v) => {
+    // //   return new Promise(async (resolve) => {
+    // //     const file = await DB.findOne<YTFile>(RecordTypes.VIDEO_FILE, v.id)
+    // //       .catch(() => resolve(true));
+    // //     if (file) {
+    // //       v.fileID = file.id;
+    // //     } else {
+    // //       const queue = await DB.findOne<YTQueue>(RecordTypes.DL_QUEUE, v.id);
+    // //       if (queue) {
+    // //         v.fileID = "In Queue";
+    // //       }
+    // //     }
+    // //     resolve(true);
+    // //   });
+    // // });
+  
+    // // await Promise.all(lookups);
+  
+    // return sr;
   }
 
-  async updateQueue(item: YTQueue) {
-    const DB = await getDB();
-    await DB.insertOrUpdateObj<YTQueue>(item);
-  }
+//   async updateQueue(item: YTQueue) {
+//     const DB = await getDB();
+//     await DB.insertOrUpdateObj<YTQueue>(item);
+//   }
 
-  async getNextQueuedDL() {
-    const DB = await getDB();
-    const results = await DB.find<YTQueue>(RecordTypes.DL_QUEUE, {
-      limit: 1,
-      clause: { complete: false, skip: false },
-      sortBy: 'requestedDate',
-      sortByDescending: true,
-    });
-    if (results.length == 0) {
-      return null;
-    }
-    return results[0];
-  }
+//   async getNextQueuedDL() {
+//     const DB = await getDB();
+//     const results = await DB.find<YTQueue>(RecordTypes.DL_QUEUE, {
+//       limit: 1,
+//       clause: { complete: false, skip: false },
+//       sortBy: 'requestedDate',
+//       sortByDescending: true,
+//     });
+//     if (results.length == 0) {
+//       return null;
+//     }
+//     return results[0];
+//   }
 
-  async getQueue(limit: Number = 1000) {
-    const DB = await getDB();
-    const queue = await DB.find<YTQueue>(RecordTypes.DL_QUEUE,
-      { limit: 1000,
-        sortBy: "requestedDate",
-        sortByDescending: true,
-       })
-      .catch((err) => {
-        Logger.warn("issues getting the queues");
-        Logger.error(err);
-        // TODO: should we return an error?
-        return [];
-      });
-    return queue;
-  }
+//   async getQueue(limit: Number = 1000) {
+//     const DB = await getDB();
+//     const queue = await DB.find<YTQueue>(RecordTypes.DL_QUEUE,
+//       { limit: 1000,
+//         sortBy: "requestedDate",
+//         sortByDescending: true,
+//        })
+//       .catch((err) => {
+//         Logger.warn("issues getting the queues");
+//         Logger.error(err);
+//         // TODO: should we return an error?
+//         return [];
+//       });
+//     return queue;
+//   }
 
-  async addQueue(videoID: string, authorID: string, title: string): Promise<YTQueue> {
-    const DB = await getDB();
-    const q : YTQueue = {
-      authorID,
-      title,
-      complete: false,
-      requestedDate: new Date(),
-      attempts: 0,
-      skip: false,
-      id: videoID,
-      recordType: RecordTypes.DL_QUEUE
-    }
-    await DB.insertOrUpdateObj<YTQueue>(q);
-    return q;
-  }
+//   async addQueue(videoID: string, authorID: string, title: string): Promise<YTQueue> {
+//     const DB = await getDB();
+//     const q : YTQueue = {
+//       authorID,
+//       title,
+//       complete: false,
+//       requestedDate: new Date(),
+//       attempts: 0,
+//       skip: false,
+//       id: videoID,
+//       recordType: RecordTypes.DL_QUEUE
+//     }
+//     await DB.insertOrUpdateObj<YTQueue>(q);
+//     return q;
+//   }
 
-  async deleteFromQueue(id: string) {
-    const DB = await getDB();
-    const record = await DB.findOne(RecordTypes.DL_QUEUE, id);
-    if (!record) {
-      return true;
-    }
-    await DB.delete(record);
-    return true;
-  }
+//   async deleteFromQueue(id: string) {
+//     const DB = await getDB();
+//     const record = await DB.findOne(RecordTypes.DL_QUEUE, id);
+//     if (!record) {
+//       return true;
+//     }
+//     await DB.delete(record);
+//     return true;
+//   }
 
-  async skipQueueItem(id: string) {
-    const DB = await getDB();
-    const record = await DB.findOne<YTQueue>(RecordTypes.DL_QUEUE, id);
-    if (!record) {
-      return { success: false, message: 'unable to find queue item'}
-    }
-    record.skip = !record.skip;
-    if (!record.skip) {
-      record.attempts = 0;
-    }
-    await DB.insertOrUpdateObj<YTQueue>(record);
-    return { success: true }
-  }
+//   async skipQueueItem(id: string) {
+//     const DB = await getDB();
+//     const record = await DB.findOne<YTQueue>(RecordTypes.DL_QUEUE, id);
+//     if (!record) {
+//       return { success: false, message: 'unable to find queue item'}
+//     }
+//     record.skip = !record.skip;
+//     if (!record.skip) {
+//       record.attempts = 0;
+//     }
+//     await DB.insertOrUpdateObj<YTQueue>(record);
+//     return { success: true }
+//   }
 }
 
 
 export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
   .decorate('yt', new Tube())
   // queue doesnt need guarding
-  .get('/queue', async ({yt}) => {
-    return yt.getQueue();
-  })
-  // nore thumbnail redownloading
-  .post('/thumbnails', async ({yt, body: {videoID}}) => {
-    yt.downloadVideoThumbnails(videoID);
+  // .get('/queue', async ({yt}) => {
+  //   return yt.getQueue();
+  // })
+  // more thumbnail redownloading
+  // enable guard
+  .use(adminGuard)
+  .post('/thumbnails', async ({yt, body: {videoId}}) => {
+    yt.downloadVideoThumbnails(videoId);
     return 'ok';
   }, {
     body: t.Object({
-      videoID: t.String(),
+      videoId: t.String(),
     })
   })
-  // enable guard
-  .use(adminGuard)
-  .get('/search', async ({yt, query}) => {
+  .get('/search', async ({error, yt, query}) => {
     const { search, ...rest } = query;
-    return yt.search(search, rest);
+    try {
+      return yt.search(search, rest);
+    } catch(err) {
+      Logger.error(err, 'failed yt search');
+      return error(400, 'issues searching yt');
+    }
   }, {
     query: t.Composite([
       t.Object({
@@ -850,49 +858,74 @@ export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
       }),
       SearchOptionsSchema,
     ]),
-    response: YTSearchResponseSchema,
-  })
-  .post('/queue', async ({yt, error, body: {authorID, videoID, title}}) => {
-    return yt.addQueue(videoID, authorID, title);
-  }, {
-    body: t.Object({
-      authorID: t.String(),
-      videoID: t.String(),
-      title: t.String(),
-    })
-  })
-  .post('/queue/:id/skip', async ({yt, error, body: {id, recordType}}) => {
-    if (recordType != RecordTypes.DL_QUEUE) {
-      return error(400, 'Trying to delete something other than a queued item');
+    // response: YTSearchResponseSchema,
+    response: {
+      200: t.Array(YTExtVideoSchema),
+      400: t.String(),
     }
-    return yt.skipQueueItem(id);
-  }, {
-    body: t.Object({
-      id: t.String(),
-      recordType: RecordTypesSchema,
-    })
   })
-  .delete('/queue', async ({yt, error, body: {id, recordType}}) => {
-    if (recordType != RecordTypes.DL_QUEUE) {
-      return error(400, 'Trying to delete something other than a queued item');
+  .post('/author', async({error, yt, body}) => {
+    try {
+      const authors : Record<string, Author> = {};
+      const a  = {
+        id: body.authorId,
+        name: body.authorName,
+        thumbnails: body.authorThumbnails,
+      }
+      await yt.addAuthorToList(a, authors);
+      return 'ok';
+    } catch(err) {
+      Logger.error(err, `unable to save author ${body.authorName}`);
+      return error(400, 'cant save author');
     }
-    return yt.deleteFromQueue(id);
   }, {
-    body: t.Object({
-      id: t.String(),
-      recordType: RecordTypesSchema,
-    })
+    body: YTExtVideoSchema,
+    response: {
+      200: t.String(),
+      400: t.String(),
+    }
   })
+  // .post('/queue', async ({yt, error, body: {authorId, videoId, title}}) => {
+  //   return yt.addQueue(videoId, authorId, title);
+  // }, {
+  //   body: t.Object({
+  //     authorId: t.String(),
+  //     videoId: t.String(),
+  //     title: t.String(),
+  //   })
+  // })
+  // .post('/queue/:id/skip', async ({yt, error, body: {id, recordType}}) => {
+  //   if (recordType != RecordTypes.DL_QUEUE) {
+  //     return error(400, 'Trying to delete something other than a queued item');
+  //   }
+  //   return yt.skipQueueItem(id);
+  // }, {
+  //   body: t.Object({
+  //     id: t.String(),
+  //     recordType: RecordTypesSchema,
+  //   })
+  // })
+  // .delete('/queue', async ({yt, error, body: {id, recordType}}) => {
+  //   if (recordType != RecordTypes.DL_QUEUE) {
+  //     return error(400, 'Trying to delete something other than a queued item');
+  //   }
+  //   return yt.deleteFromQueue(id);
+  // }, {
+  //   body: t.Object({
+  //     id: t.String(),
+  //     recordType: RecordTypesSchema,
+  //   })
+  // })
   // download video now
-  .post('/video', async ({yt, error, body: {authorID, videoID}}) => {
-    const resp = await yt.downloadYTVideo(videoID, authorID);
+  .post('/video', async ({yt, error, body: {authorId, videoId}}) => {
+    const resp = await yt.downloadYTVideo(videoId, authorId);
     if(resp.error) {
       return error(500, resp.error);
     }
     return resp;
   }, {
     body: t.Object({
-      authorID: t.String(),
-      videoID: t.String(),
+      authorId: t.String(),
+      videoId: t.String(),
     })
   });

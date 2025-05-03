@@ -1,0 +1,136 @@
+import { relations, sql } from "drizzle-orm";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { createInsertSchema, createSelectSchema } from "drizzle-typebox";
+
+export const ProfileTable = sqliteTable("profile", {
+  id: integer().primaryKey(),
+  displayName: text().notNull(),
+  email: text().notNull(),
+  admin: integer({mode: "boolean"}).notNull().default(false),
+  createdAt: text().notNull().default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+export const profileSchema = createSelectSchema(ProfileTable);
+export const profileInsertSchema = createInsertSchema(ProfileTable);
+export type Profile = typeof profileSchema.static;
+export type ProfileInsert = typeof profileInsertSchema.static;
+
+export const PasswordTable = sqliteTable("password", {
+  id: integer().primaryKey().notNull().references(() => ProfileTable.id),
+  pwHash: text().notNull()
+});
+
+export const passwordSchema = createSelectSchema(PasswordTable);
+export const passwordInsertSchema = createInsertSchema(PasswordTable);
+export type Password = typeof passwordSchema.static;
+export type PasswordInsert = typeof passwordInsertSchema.static;
+
+export const ThumbnailTable = sqliteTable("thumbnail", {
+  id: text().primaryKey().notNull(),
+  url: text(),
+  width: integer().notNull(),
+  height: integer().notNull(),
+  size: text().notNull(),
+  // just embed the file info in here
+  fileExtention: text().notNull(),
+  filename: text().notNull(),
+  authorId: text().notNull().references(() => AuthorTable.id),
+  contentLength: integer().notNull()
+});
+
+export const thumbnailSchema = createSelectSchema(ThumbnailTable);
+export const thumbnailInsertSchema = createInsertSchema(ThumbnailTable);
+export type Thumbnail = typeof thumbnailSchema.static;
+export type ThumbnailInsert = typeof thumbnailInsertSchema.static;
+
+export const AuthorTable = sqliteTable("author", {
+  id: text().primaryKey().notNull(),
+  name: text().notNull(),
+  url: text().notNull(),
+});
+
+export const authorSchema = createSelectSchema(AuthorTable);
+export const authorInsertSchema = createInsertSchema(AuthorTable);
+
+export type Author = typeof authorSchema.static;
+export type AuthorInsert = typeof authorInsertSchema.static;
+
+export const VideoTable = sqliteTable("video", {
+  id: text().notNull().primaryKey(),
+  title: text(),
+  authorId: text().notNull().references(() => AuthorTable.id),
+  durationText: text().notNull(),
+  durationSeconds: integer().notNull(),
+  // fileId: varchar({length: 255}).notNull().references(() => FileTable.id),
+  quality: text(),
+  format: text(),
+  fileExtention: text(),
+  filename: text(),
+  contentLength: integer()
+});
+
+export const videoSchema = createSelectSchema(VideoTable);
+export const videoInsertSchema = createInsertSchema(VideoTable);
+export type Video = typeof videoSchema.static;
+export type VideoInsert = typeof videoInsertSchema.static;
+
+export const QueueTable = sqliteTable("queue", {
+  // video id, but we cant reference as it doesnt exist yet
+  id: text().primaryKey().notNull(),
+  authorId: text().notNull().references(() => AuthorTable.id),
+  title: text().notNull(),
+  complete: integer({mode: "boolean"}).notNull().default(false),
+  requestedDate: text().notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  attempts: integer().notNull().default(0),
+  skip: integer({mode: "boolean"}).notNull().default(false),
+});
+
+export const queueSchema = createSelectSchema(QueueTable);
+export const queueInsertSchema = createInsertSchema(QueueTable);
+export type Queue = typeof queueSchema.static;
+export type QueueInsert = typeof queueInsertSchema.static;
+
+
+// * MANY TO MANY TABLES
+// mostly anything that touches thumbnails has a many-to-many relationship
+// since we usually have a few thumbnails for every thing
+
+export const AuthorsToThumbnailsTable = sqliteTable("authors_to_thumbnail", {
+  authorId: text().notNull().references(() => AuthorTable.id),
+  thumbnailId: text().notNull().references(() => ThumbnailTable.id),
+},
+(t) => [
+  primaryKey({ columns: [t.authorId, t.thumbnailId]}),
+]);
+
+export const VideosToThumbnailsTable = sqliteTable("videos_to_thumbnail", {
+  videoId: text().notNull().references(() => VideoTable.id),
+  thumbnailId: text().notNull().references(() => ThumbnailTable.id),
+},
+(t) => [
+  primaryKey({ columns: [t.videoId, t.thumbnailId]}),
+]);
+
+export const VideosToThumbnailSchema = createSelectSchema(VideosToThumbnailsTable);
+export const VideosToThumbnailInsertSchema = createInsertSchema(VideosToThumbnailsTable);
+export type VideosToThumbnails = typeof VideosToThumbnailSchema.static;
+export type VideosToThumbnailInsert = typeof VideosToThumbnailInsertSchema.static;
+
+
+// * RELATIONS DEFINITIONS
+// we do this at the end so everything needed is defined already
+
+export const AuthorRelations = relations(AuthorTable, ({many}) => ({
+  AuthorsToThumbnails: many(AuthorsToThumbnailsTable),
+  AuthorsToVideos : many(VideoTable),
+}));
+
+export const ThumbnailRelations = relations(ThumbnailTable, ({many, one}) => ( {
+  ThumbnailToAuthor : one(AuthorTable, {fields: [ThumbnailTable.authorId], references: [AuthorTable.id]}),
+  ThumbnailsToVideos : many(VideosToThumbnailsTable),
+}));
+
+export const VideoRelations = relations(VideoTable, ({many, one}) => ({
+  VideosToThumbnails : many(VideosToThumbnailsTable),
+  AuthorsToVideos : one(AuthorTable),
+}));

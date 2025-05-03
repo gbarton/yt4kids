@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+    	"@backend": ["./server/src"],
+    	"@backend/*": ["./server/src/*"],
+    	"@frontend": ["./svelte/src"],
+    	"@frontend/*": ["./svelte/src/*"]
+    }
+  }
+}

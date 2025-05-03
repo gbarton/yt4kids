@@ -1,73 +1,138 @@
 import { Elysia, t } from 'elysia'
 import Logger from '../Log';
-import getDB from '../db/DB';
-import { QueryOptions, RecordTypes, YTAuthor, YTFile, YTSearch, YTSearchResponse, YTSearchResponseSchema, YTSearchSchema, YTVideoInfo, YTVideoInfoSchema } from '../db/Types';
+import { getDB } from '../../db/DB';
+import { type YTSearch, YTSearchResponseSchema, YTSearchSchema } from '../db/Types';
 import { existsSync, createReadStream, ReadStream } from 'node:fs';
+import { type Author, AuthorTable, lower, ThumbnailTable, type VideoInsert, videoSchema, VideosToThumbnailsTable, VideoTable } from '../../db/schema';
+import { and, desc, eq, isNotNull, like } from 'drizzle-orm';
 
-class Videos {
+export class Videos {
   constructor() {}
 
   async getVideoFile(id: string) {
     Logger.info(`file request for id ${id}`);
-    const DB = await getDB();
-    return DB.findOne<YTFile>(RecordTypes.VIDEO_FILE, id);
+    const db = await getDB();
+    const query = db.select({
+      filename: VideoTable.filename,
+      contentLength: VideoTable.contentLength,
+      fileExtention: VideoTable.fileExtention,
+    })
+    .from(VideoTable).where(eq(VideoTable.id, id)).limit(1);
+    Logger.debug(query.toSQL());
+
+    const file = await query;
+    return file.length == 1 ? file[0] : null;
+  }
+
+  async insertVideo(vid: VideoInsert) {
+    const db = await getDB();
+    const results = await db.insert(VideoTable)
+      .values([vid])
+      .onConflictDoNothing()
+      .returning();
+    
+    return results.length == 1 ? results[0] : null;
   }
 
   async getVideo(id: string) {
     Logger.info(`video info request for id ${id}`);
-    const DB = await getDB();
-    return DB.findOne<YTVideoInfo>(RecordTypes.VIDEO, id);
+    const db = await getDB();
+    const query = db.select()
+      .from(VideoTable)
+      .where(eq(VideoTable.id, id)).limit(1);
+    Logger.debug(query.toSQL());
+    const video = await query;
+
+    if (video.length == 0) {
+      return null;
+    }
+    return video[0];
   }
 
-  async getVideos(searchOpts: YTSearch): Promise<YTSearchResponse> {
-    const DB = await getDB();
-  
-    const qo: QueryOptions = {
-      // custom sort function because you cant do nested props with simplesort
-      sortFunction:  function(o1: any, o2: any) {
-        return o1.meta?.created < o2.meta?.created? 1 : -1;
-      },
-      limit: searchOpts.limit,
-      offset: searchOpts.offset,
-    }
-  
-    if(searchOpts.authorID) {
-      qo.clause = { authorID: searchOpts.authorID };
-    }
-  
-    if(searchOpts.search) {
-      qo.keywords = [{col: "title", values: searchOpts.search.split(" ")}]
-    }
-  
-    const results = await DB.find<YTVideoInfo>(RecordTypes.VIDEO, qo);
-    Logger.info(`video search found ${results.length} videos`);
-  
-    const authors: {[key: string]: YTAuthor} = {};
-    // resolve all the authors (unique the id's first)
-    const promises = [... new Set(results.map((v) => v.authorID))]
-      .map((id): Promise<YTAuthor> => {
-        return new Promise(async (resolve, reject) => {
-          const author = await DB.findOne<YTAuthor>(RecordTypes.AUTHOR, id);
-          if (author !== null) {
-            authors[id] = author;
-            return resolve(author);
-          }
-        });
-      });
-    await Promise.all(promises);
+  async getVideos(searchOpts: YTSearch) {
+    const db = await getDB();
+
+    let query = db.select().from(VideoTable)
+      .fullJoin(AuthorTable, eq(VideoTable.authorId, AuthorTable.id))
+      .where(
+        and(
+          searchOpts.authorId ? eq(VideoTable.authorId, searchOpts.authorId) : undefined,
+          searchOpts.search? like(lower(VideoTable.title), `%${searchOpts.search.toLowerCase()}%`) : undefined
+        )
+      )
+      .orderBy(VideoTable.title)
+      .limit(searchOpts.limit)
+      .offset(searchOpts.offset);
+
     
+    Logger.debug(query.toSQL());
+    const results = await query;
+
+    const videos = results.map((r) => r.video).filter((v) => v != null);
+    const authors : Record<string, Author> = {};
+    results.forEach((r) => {
+      if (r.author != null && !(r.author.id in authors)) {
+        authors[r.author.id] = r.author;
+      }
+    });
+    // const authors : Author[] = [];
+
+    // results
+    // .forEach((r) => {
+    //   if (r.author != null && !authors.some((author) => author.name === r.author?.name)) { // Check if the author is already in the array
+    //     authors.push(r.author); // Add the author to the array
+    //   }
+    // });
+  
+    // authors.sort((a, b) => a.name.localeCompare(b.name)); // Sort authors by name
+
     return {
-      query: "",
-      channels: [],
-      videos: results,
+      query: searchOpts.search || "",
+      // channels: [],
+      videos: videos,
       authors,
     };
   }
 
-  async getThumbnail(id: string) {
-    const DB = await getDB();
-    return DB.findOne<YTFile>(RecordTypes.THUMBNAIL_FILE, id);
+  // grab all the thumbnails that have a fileId and sort by the largest
+  async getBestThumbnailForVideo(id: string) {
+    const db = await getDB();
+    const query = db.select({
+        filename: ThumbnailTable.filename,
+        url: ThumbnailTable.url,
+        contentLength: ThumbnailTable.contentLength,
+      }).from(ThumbnailTable)
+      .leftJoin(VideosToThumbnailsTable, eq(ThumbnailTable.id, VideosToThumbnailsTable.thumbnailId))
+      .where(
+        and(
+          eq(VideosToThumbnailsTable.videoId, id),
+          isNotNull(ThumbnailTable.filename)
+        )
+      )
+      .orderBy(desc(ThumbnailTable.width));
+    Logger.debug(query.toSQL());
+    const results = await query;
+
+    if (results.length == 0) {
+      return null;
+    }
+
+    return results[0];
   }
+
+  // async getThumbnailFileInfo(id: string) {
+  //   const db = await getDB();
+  //   const query = db.select()
+  //     .from(ThumbnailTable)
+  //     .fullJoin(FileTable, eq(ThumbnailTable.fileId, FileTable.id))
+  //     .where(eq(ThumbnailTable.id, id)).limit(1);
+  //   Logger.debug(query.toSQL());
+  //   const results = await query;
+  //   if (results.length == 1 && results[0].file != null) {
+  //     return results[0].file;
+  //   }
+  //   return null;
+  // }
 }
 
 const contentType: {[key: string]: string} = {
@@ -79,27 +144,37 @@ export const VideoEndpoints = new Elysia({ prefix: '/videos' })
   .get('/search', ({videos, query}) => {
     return videos.getVideos(query);
   }, {
+    detail: {
+      description: "Search downloaded videos, all fields optional. search field will search the titles",
+    },
     query: YTSearchSchema,
     response: YTSearchResponseSchema,
   })
-  .get('/info/:id', async ({error, params: { id }, videos}) =>  {
-    const info = videos.getVideo(id);
-    if (info == null) {
+  .get('/:id', async ({error, params: { id }, videos}) =>  {
+    const info = await videos.getVideo(id);
+    if (info === null) {
       return error(400, 'video not found');
     }
     return info;
   }, {
+    detail: {
+      description: "Retrieve video info for a given id",
+    },
     params: t.Object({id: t.String()}),
+    response: {
+      200: videoSchema,
+      400: t.String(),
+    }
     // response: YTVideoInfoSchema,
   })
-  .get('/chunk/:id', async ({error, set, videos, headers, params: { id }}) => {
+  .get('/:id/chunk', async ({error, set, videos, headers, params: { id }}) => {
     Logger.info(`request for video chunk id ${id}`);
     const record = await videos.getVideoFile(id);
     // log.info(record, 'video requested');
     if (!record || record === undefined) {
       return error(400, 'video meta not found');
     }
-    if (!record?.filename) {
+    if (!record?.filename || !record?.contentLength || !record?.fileExtention) {
       return error(400, 'video file not found');
     }
     if (!existsSync(record.filename)) {
@@ -168,14 +243,17 @@ export const VideoEndpoints = new Elysia({ prefix: '/videos' })
   }, {
     params: t.Object({id: t.String()})
   })
-  .get('/thumbnail/:id', async ({error, set, videos, params: { id }}) => {
-    const fileInfo =  await videos.getThumbnail(id);
+  .get('/:id/thumbnail', async ({error, set, videos, params: { id }}) => {
+    const fileInfo = await videos.getBestThumbnailForVideo(id);
     if (!fileInfo || fileInfo === undefined) {
       Logger.warn(`could not find the thumbnail file`);
       return error(400, 'file meta not found');
-    }
+    } 
   
     const file = Bun.file(fileInfo.filename);
+    if (!file.exists()) {
+      Logger.warn(`missing thumbnail for video ${id} at: ${fileInfo.filename}`);
+    }
     const stream = file.stream();
 
     set.headers['Content-Length'] = `${fileInfo.contentLength}`;
@@ -184,5 +262,4 @@ export const VideoEndpoints = new Elysia({ prefix: '/videos' })
     return stream;
   }, {
     params: t.Object({id: t.String()}),
-
   });

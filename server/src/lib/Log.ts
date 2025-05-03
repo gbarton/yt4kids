@@ -1,6 +1,6 @@
 import { createPinoLogger } from "@bogeychan/elysia-logger";
 
-const LEVEL = Bun.env.LOG_LEVEL || "debug";
+const LEVEL = process.env.LOG_LEVEL || "debug";
 
 const Logger = createPinoLogger( {
   level: LEVEL,

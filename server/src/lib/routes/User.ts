@@ -2,8 +2,11 @@ import { Elysia, t } from 'elysia'
 import { jwt } from '@elysiajs/jwt'
 import Logger from '../Log';
 import { v7 } from 'uuid';
-import { YTProfile, YTPassword, RecordTypes } from '../db/Types';
-import getDB from '../db/DB';
+import { ProfileTable, PasswordTable, ProfileInsert, PasswordInsert } from '../../db/schema';
+import { getDB } from '../../db/DB';
+import { eq } from 'drizzle-orm';
+// import { YTProfile, YTPassword, RecordTypes } from '../db/Types';
+// import getDB from '../db/DB';
 
 const TOKEN_KEY = "x-cflr-token";
 const PW_LENGTH = 4;
@@ -14,34 +17,47 @@ class User {
     Logger.info("User obj online");
   }
 
-  async exists(email: string) {
+  async getProfile(email: string) {
     const db = await getDB();
-    const user = await db.findOne<YTProfile>(RecordTypes.USER_PROFILE, email);
+    const query = db.select().from(ProfileTable)
+      .where(eq(ProfileTable.email, email)).limit(1);
+    Logger.debug(query.toSQL());
+    const user = await query;
+    return user.length == 1 ? user[0] : null;
+  }
+
+  async exists(email: string) {
+    const user = await this.getProfile(email);
     return user == null ? false : true;
   }
 
-  async getProfile(email: string) {
-    const DB = await getDB();
-    return DB.findOne<YTProfile>(RecordTypes.USER_PROFILE, email);
-  }
-
   async getPW(email: string) {
-    const DB = await getDB();
-    return DB.findOne<YTPassword>(RecordTypes.USER_PWHASH, email);
+    const user = await this.getProfile(email);
+    if (! user) {
+      return null;
+    }
+    const db = await getDB();
+    const query = db.select().from(PasswordTable).where(eq(PasswordTable.id, user.id)).limit(1);
+    Logger.debug(query.toSQL());
+    const pw = await query;
+    return pw.length == 1 ? pw[0].pwHash : null;
   }
 
   async getProfiles() {
-    const DB = await getDB();
-    return DB.find<YTProfile>(RecordTypes.USER_PROFILE, { limit: 100 });
+    const db = await getDB();
+    const query = db.select().from(ProfileTable).orderBy(ProfileTable.displayName);
+    Logger.debug(query.toSQL());
+    const profiles = await query;
+    return profiles;
   }
 
   async login(email: string, password: string) {
     Logger.info(`logging in ${email}`);
-    const user = await this.getPW(email);
+    const hash = await this.getPW(email);
     
-    if (user == null) return { success: false, message: 'User not found' }
+    if (hash == null) return { success: false, message: 'User not found' }
 
-    const isMatch = await Bun.password.verify(password, user.pwHash);
+    const isMatch = await Bun.password.verify(password, hash);
     Logger.info(isMatch);
     if (!isMatch) return { success: false, message: 'Invalid password' }
     const profile = await this.getProfile(email);
@@ -49,7 +65,7 @@ class User {
     return { success: true, email, profile }
   }
 
-  async register(password: string, ytProfile: YTProfile) {
+  async register(password: string, ytProfile: ProfileInsert) {
     if (await this.exists(ytProfile.email)) {
       return { success: false, message: 'User already exists' }
     }
@@ -59,15 +75,16 @@ class User {
       cost: 4
     });
 
-    const DB = await getDB();
-    const ytPW: YTPassword = {
-      id: ytProfile.email,
+    const db = await getDB();
+    const inserted = await db.insert(ProfileTable).values(ytProfile).returning();
+    const profile = inserted[0];
+
+    const ytPW: PasswordInsert = {
+      id: profile.id,
       pwHash: hashedPassword,
-      recordType: RecordTypes.USER_PWHASH,
     };
 
-    await DB.insertOrUpdateObj(ytPW);
-    await DB.insertOrUpdateObj(ytProfile);
+    await db.insert(PasswordTable).values(ytPW);
     
     return { success: true, message: 'welcome!' }
   }
@@ -160,67 +177,6 @@ export const userGuard = new Elysia({name: 'loggedIn'})
     })
    .as('plugin');
 
-// // guards to ensure the user is actually logged in with valid token and cookie
-// export const userGuards = new Elysia({name:'signin'})
-//   .use(userService)
-//   .macro(({onBeforeHandle}) => ({
-//     // a function that if enabled will test for valid cookie
-//     isSignIn(enabled: boolean) {
-//       if (!enabled) return;
-
-//       onBeforeHandle(
-//         async ({error, cookie: {auth}, headers, jwt}) => {
-//           Logger.info(auth, 'onBefore Triggered');
-//           // check the cookie is there
-//           if (!auth.value) {
-//             Logger.warn('no cookie present');
-//             return error(401, {
-//               success: false,
-//               message: 'you must be signed in to access this content'
-//             });
-//           }
-
-//           const verified = await jwt.verify(auth.value);
-//           // junk jwt or expired
-//           if (!verified) {
-//             return error(401, {
-//               success: false,
-//               message: 'you must be signed in to access this content 1',
-//             });
-//           }
-//           // TODO: handle type conversion error
-//           const jwtToken = verified as JwtTokenType;
-//           // Logger.info(jwtToken);
-//           // Logger.info(headers, "headers");
-
-//           // check the token is there in the headers
-//           if (!headers[TOKEN_KEY]) {
-//             Logger.warn("no token present");
-//             return error(401, {
-//               success: false,
-//               message: 'you must be signed in to access this content 2',
-//             });
-//           }
-
-
-//           const token = headers[TOKEN_KEY];
-//           if (token !== jwtToken.token) {
-//             return error(401, {
-//               success: false,
-//               message: 'unauthorized',
-//             });
-//           }
-          
-//         }
-//       )
-//     }
-//   }))
-//   .guard({
-//     isSignIn: true,
-//   })
-//   .as('plugin'); // dunno what this does, but the onbefore wont trigger without it
-
-
 export const adminGuard = new Elysia({name: "admin"})
 .use(userGuard)
 .guard({
@@ -243,51 +199,9 @@ export const adminGuard = new Elysia({name: "admin"})
 .as('plugin'); // dunno what this does, but the onbefore wont trigger without it
   
 
-
-// export const adminGuards = new Elysia({name:'admin'})
-//   .use(userGuard)
-//   .macro(({onBeforeHandle}) => ({
-//     // a function that if enabled will test for valid cookie
-//     isAdmin(enabled: boolean) {
-//       if (!enabled) return;
-
-//       onBeforeHandle(
-//         async ({error, users, cookie: {auth}, jwt}) => {
-//           //TODO: doing this twice, in the user guard and here...
-//           const verified = await jwt.verify(auth.value);
-//           // junk jwt or expired
-//           if (!verified) {
-//             return error(401, {
-//               success: false,
-//               message: 'you must be signed in to access this content 1',
-//             });
-//           }
-//           // TODO: handle type conversion error
-//           const jwtToken = verified as JwtTokenType;
-//           const profile = await users.getProfile(jwtToken.email);
-//           if (profile == null) {
-//             return error(401, {
-//               success: false,
-//               message: 'you must be signed in to access this content 3',
-//             });
-//           }
-//           if (!profile.admin) {
-//             return error(401, {
-//               success: false,
-//               message: 'you must be an admin',
-//             });
-//           }
-//       })
-//     }
-//   }))
-//   .guard({
-//     isAdmin: true,
-//   })
-//   .as('plugin');
-
 export const UserEndpoints = new Elysia({ prefix: '/user' })
   .use(userService)
-  .post('/register', async ({ redirect, users, body}) => {
+  .post('/register', async ({ error, users, body}) => {
     const { password, verifyPassword, email, displayName, admin } = body; 
     if (password != verifyPassword) {
       Logger.info('pw mismatch');
@@ -296,24 +210,23 @@ export const UserEndpoints = new Elysia({ prefix: '/user' })
 
     const userLists = await users.getProfiles();
 
-    const ytProfile: YTProfile = {
-      id: email,
+    const ytProfile: ProfileInsert = {
       displayName,
+      // ? not sure about forcing the first user to admin anymore
       admin : admin == true ? true : userLists.length == 0 ? true : false,
-      recordType: RecordTypes.USER_PROFILE,
       email,
     };
 
-    const user = await users.register(password, ytProfile);
-    if (user.success) {
+    const action = await users.register(password, ytProfile);
+    if (action.success) {
       Logger.info(`registered user ${email}`);
       return { success: true, message: "ok" }
       // return redirect('#/login');
     } else {
       Logger.info('failed register');
-      return { success: false, message: user.message }
+      return error(400, action);
     } 
-    },
+  },
     {
       body: t.Object({
         email: t.String({
@@ -329,6 +242,7 @@ export const UserEndpoints = new Elysia({ prefix: '/user' })
     async ({ error, set, jwt, cookie: {auth}, body: {email, password}, users }) => {
       const user = await users.login(email, password);
       if (!user.success) {
+        Logger.warn(`login failure for user ${email}`);
         return error(401, { success: false, message: user.message });
       }
       

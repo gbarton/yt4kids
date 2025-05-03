@@ -1,6 +1,6 @@
 <script lang="ts">
   import "./app.css"
-  import Router, { push } from 'svelte-spa-router'
+  import Router, { push } from 'svelte-spa-router';
   import routes from './routes'
   import { Avatar, Navbar, Button, Dropdown, DropdownHeader, DropdownItem, DropdownDivider, Input, NavBrand, NavLi, NavUl, NavHamburger } from 'flowbite-svelte';
   import { SearchOutline } from 'flowbite-svelte-icons';
@@ -35,9 +35,8 @@
     </div>
     <div class="flex items-center md:order-2 ml-2">
       <Avatar id="avatar-menu" border class="{$loggedIn ? 'ring-green-400' : 'ring-red-400'}" />
-      <NavHamburger class1="w-full md:flex md:w-auto md:order-1" />
+      <NavHamburger class="w-full md:flex md:w-auto md:order-1" />
     </div>
-    <!-- <NavHamburger></NavHamburger> -->
   </div>
   <Dropdown placement="bottom" triggeredBy="#avatar-menu">
     {#if $loggedIn}

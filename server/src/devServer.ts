@@ -1,16 +1,23 @@
+// cause im being lazy and want to use the testcontainers pg for dev
+import Logger from "./lib/Log";
+import { setupDockerTestDb } from "./lib/SetupFor.test";
 import { Elysia } from "elysia";
 import swagger from "@elysiajs/swagger";
 import { staticPlugin } from "@elysiajs/static";
 import { cors } from '@elysiajs/cors';
 import { UserEndpoints } from "./lib/routes/User";
-import Logger from './lib/Log';
 import { VideoEndpoints } from "./lib/routes/Videos";
 import { ExternalEndpoints } from "./lib/routes/YT";
 
 import Manager from "./lib/Manager";
 import { AuthorsEndpoints } from "./lib/routes/Authors";
-import { migrateDB } from "./db/DB";
 import { QueueEndpoints } from "./lib/routes/Queues";
+import { migrateDB } from "./db/DB";
+import { loadLokiData } from "./migrate";
+
+const setup = await setupDockerTestDb();
+
+const stop = setup.stop;
 
 async function init() {
   Logger.info('migrating db');
@@ -23,11 +30,13 @@ await init();
 
 Logger.info('DB migrations complete, starting server');
 
+// await loadLokiData();
+
 Manager.getInstance();
 
 const PORT = +(Bun.env.YT_PORT || 3000);
 
-const app = new Elysia()
+export const app = new Elysia()
   .use(Logger.into())
   .use(cors())
   .use(swagger())
@@ -37,7 +46,7 @@ const app = new Elysia()
   }))
   .group('/api', (api) => 
     api
-      .get('', () => "Hello Elysia")
+      .get("/", () => "Hello Elysia")
       .use(UserEndpoints)
       .use(VideoEndpoints)
       .use(AuthorsEndpoints)
@@ -50,4 +59,22 @@ Logger.info(
   `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
 );
 
-export type App = typeof app;
+
+const die = async () => {
+  Logger.warn('shutting down from signal');
+  await stop();
+  Logger.warn('db down');
+  await app.stop();
+  Logger.warn('app down');
+  process.exit();
+}
+
+process.on("SIGINT", async () => {
+  await die();
+});
+
+process.on("SIGKILL", async () => {
+  await die();
+});
+
+
