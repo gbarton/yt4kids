@@ -51,3 +51,20 @@ Logger.info(
 );
 
 export type App = typeof app;
+
+// const die = async () => {
+//   Logger.warn('shutting down from signal');
+//   await stop();
+//   Logger.warn('db down');
+//   await app.stop();
+//   Logger.warn('app down');
+//   process.exit();
+// }
+
+// process.on("SIGINT", async () => {
+//   await die();
+// });
+
+// process.on("SIGKILL", async () => {
+//   await die();
+// });

@@ -1,26 +1,23 @@
-version: "3.4"
 services:
-  yt4kids:
-    container_name: yt4kids
-      #image: yt4kids:latest
-    image: yt4kids:latest
+  yt4kids2:
+    container_name: yt4kids2
+    image: yt4kids2:latest
     # build:
     #   context: .
     restart: always
     environment:
+      - DATABASE_URL=postgres://dev:dev@10.22.22.1:5432/dev
       - YT_PORT=3000
       - YK_STORAGE_DIR=./storage
-      - YK_DB_STORAGE_DIR=./storage/db
-      - YK_LOKI_ADAPTER=disk
-      - YK_DB_TYPE=LOKI
       - YT_ACCESS_SECRET=ASECRETINDEED
       - YT_REFRESH_SECRET=REFRESHINGISGOOD
       - YT_ACCESS_DURATION=1d
       - YT_REFRESH_DURATION=1w
       - YT_DOWNLOAD_INTERVAL=60000
+      - YT_DOWNLOAD_RETRIES=3
     ports:
-      - "3001:3000"
+      - "3010:3000"
     volumes:
-      - "/disk/2/storage:/app/storage"
+      - "/disk/2/yt4kids:/app/storage"
 
     

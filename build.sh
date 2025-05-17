@@ -5,11 +5,15 @@ set -x
 
 rm -rf server/dist/*
 
-cd svelte
-rm -rf dist/*
-npm install
-pwd
-npm run build
+cd frontend
+rm -rf build/*
+bun run build
+
+# cd svelte
+# rm -rf dist/*
+# npm install
+# pwd
+# npm run build
 
 # cd ../server
 # bun install
@@ -19,4 +23,4 @@ npm run build
 
 cd ../
 
-docker build -t yt4kids:$(date '+%Y-%m-%d') -t yt4kids:latest .
+docker build -t yt4kids2:$(date '+%Y-%m-%d') -t yt4kids2:latest .

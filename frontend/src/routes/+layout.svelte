@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { admin, loggedIn, userState } from '$lib/ClientStore.svelte';
+    import { goto } from '$app/navigation';
+	import { admin, loggedIn, userState } from '$lib/ClientStore.svelte';
 	import '../app.css';
 	
 	let { children } = $props();
@@ -16,7 +17,9 @@
 		
 	</div>
 	<div class="flex items-center">
-		<input type="text" placeholder="Search..." class="p-2 rounded border-none bg-gray-700 text-white mr-4"/>
+		<form method="GET" action="/">
+			<input name="search" type="text" placeholder="Search..." class="p-2 rounded border-none bg-gray-700 text-white mr-4"/>
+		</form>
 		{#if loggedIn()}
 		<span>Welcome {userState.displayName} </span>
 		<button class="p-2 ml-1 rounded border-none bg-gray-700 text-white hover:bg-gray-600" aria-label="User Profile">
@@ -27,7 +30,3 @@
 </nav>
 
 {@render children()}
-
-<!-- <style>
-  @import 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css';
-</style> -->

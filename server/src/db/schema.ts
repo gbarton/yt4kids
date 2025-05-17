@@ -1,4 +1,4 @@
-import { relations, sql, SQL, Table } from "drizzle-orm";
+import { relations, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, bigint, boolean, integer, pgSchema, primaryKey, smallint, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-typebox";
 

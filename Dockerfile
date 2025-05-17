@@ -7,7 +7,9 @@ WORKDIR /app
 COPY server/*.json .
 RUN bun install --production
 COPY server/src ./src
-COPY svelte/dist ./public/
+# get the db migrations
+COPY server/db ./db
+COPY frontend/build ./public/
 # COPY server/dist .
 CMD ["bun", "run", "src/index.ts"]
 EXPOSE 3000

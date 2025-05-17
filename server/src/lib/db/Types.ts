@@ -1,4 +1,4 @@
-import { t } from 'elysia';
+import { t, TSchema } from 'elysia';
 import { authorSchema, videoSchema } from '../../db/schema';
 
 // EXTERNAL ONES FOR YT LIB
@@ -207,10 +207,29 @@ export const YTExtVideoSchema = t.Object({
 
 export type YTExtVideo = typeof YTExtVideoSchema.static;
 
+const Nullable = <T extends TSchema>(schema: T) => t.Union([t.Null(), schema])
+
 export const YTSearchResponseSchema = t.Object({
   query: t.String(),
   videos: t.Array(videoSchema),
+  // videos: t.Array(t.Object({
+  //   id: t.String(),
+  //   title: Nullable(t.String()),
+  //   authorId: t.String(),
+  //   durationText: t.String(),
+  //   durationSeconds: t.Number(),
+  //   quality: Nullable(t.String()),
+  //   format: Nullable(t.String()),
+  //   fileExtention: Nullable(t.String()),
+  //   filename: Nullable(t.String()),
+  //   contentLength: Nullable(t.Number()),
+  // })),
   authors: t.Record(t.String(), authorSchema),
+  // authors: t.Record(t.String(), t.Object({
+  //   id: t.String(),
+  //   name: t.String(),
+  //   url: t.String()
+  // }))
 });
 
 export type YTSearchResponse = typeof YTSearchResponseSchema.static;

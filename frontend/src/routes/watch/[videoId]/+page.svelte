@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { Video } from '@backend/db/schema';
   import type { PageProps } from './$types';
 
   let { data }: PageProps = $props();

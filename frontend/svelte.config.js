@@ -8,10 +8,12 @@ const config = {
 	preprocess: vitePreprocess(),
 
 	kit: {
-		adapter: adapter(),
+		adapter: adapter({
+			fallback: 'index.html',
+		}),
 		alias: {
 			"@backend": "../server/src",
-    	"@backend/*": "../server/src/*",
+    	// "@backend/*": "../server/src/lib/db/*",
 		}
 	}
 };

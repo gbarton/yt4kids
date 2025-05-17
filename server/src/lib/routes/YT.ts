@@ -55,7 +55,8 @@ async function getFFMPEGPath() {
 
 async function getYT(client_type?: ClientType): Promise<Innertube> {
   // TODO: support testing by returning a mock one
-    return Innertube.create({ client_type, retrieve_player: true });
+  Logger.debug( `using yt client type: ${client_type}` );
+  return Innertube.create({ client_type, retrieve_player: true });
 }
 
 function getStorageDir(): string {
@@ -448,7 +449,7 @@ export class Tube {
     let videoQuality: string;
     let hasAudio: boolean = false;
     const { title, author } = info.basic_info;
-    Logger.debug(info.basic_info);
+    Logger.trace(info.basic_info);
   
     if (!title || !author) {
       return { error: 'Missing title/author info for video'};

@@ -29,26 +29,28 @@ Now its a fun project to rethink content delivery in such a way that would be sa
 The following environment variables are usable either as a `.env` file or passed in.
 
 ```bash
-# where to store the files
+# where on disk video's and thumbnails are stored
 YK_STORAGE_DIR=./storage
-
-# Storage engine for metadata
-# TODO: make more than 1!
-YK_DB_TYPE=LOKI
-# where should the db store
-YK_DB_STORAGE_DIR=./storage/db
-# loki specific settings
-# disk/memory
-YK_LOKI_ADAPTER=disk
+# url to the postgres db
+DATABASE_URL=postgres://dev:dev@10.22.22.1:5432/dev
 
 # Download interval (default 5m)
 # How often we try to download a video
 # too fast and you could get IP banned!
-YT_DOWNLOAD_INTERVAL=300000
+YT_DOWNLOAD_INTERVAL=30000
 # Retry attempts for queued items
 # some videos just dont come down so skip after this many tries
 YT_DOWNLOAD_RETRIES=10
 
+# # JWT secrets, please customize!
+# YT_ACCESS_SECRET=CHANGEME
+# YT_REFRESH_SECRET=ANDMETOO
+# # access duration (can be human format, e.g. 20s, 4h, 1d)
+# YT_ACCESS_DURATION=1d
+# # refresh token duration (can be human format, e.g. 20s, 4h, 1d)
+# YT_REFRESH_DURATION=1w
+
+YT_PORT=3123
 
 ```
 
@@ -64,16 +66,16 @@ bun install
 bun install -g pino-pretty
 
 # run server in dev mode
-npm dev | pino-pretty
+bun run dev | pino-pretty
 ```
 
 ```bash
-cd svelte
+cd frontend
 ## in separate bash shell, run ui:
 npm install
-
+bun
 # run vite dev with hot reload
-npm run dev
+bun run dev --host
 ```
 
 ## Building
@@ -92,8 +94,7 @@ docker compose up
 Projects that helped or inspired
 
 * [Youtube.js](https://github.com/LuanRT/YouTube.js) - Amazing library to interact with the youtube api
-* [Svelte](https://svelte.dev/) - Refreshing framework for frontend development (not using sveltekit)
-* [Flowbite Svelte](https://flowbite-svelte.com) - The pretty css bits
+* [Svelte](https://svelte.dev/) - Refreshing framework for frontend development
 
 ## Disclaimer
 This project is not affiliated with, endorsed, or sponsored by YouTube or any of its affiliates or subsidiaries. All trademarks, logos, and brand names used in this project are the property of their respective owners and are used solely to describe the services provided.

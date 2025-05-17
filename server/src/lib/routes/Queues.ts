@@ -160,7 +160,7 @@ export const QueueEndpoints = new Elysia({ prefix: '/queue' })
       return error(400, 'Error updating queue item');
     } 
   }, {
-    params: t.Object({ id: t.String(), title: t.String() }),
+    params: t.Object({ id: t.String() }),
     response: {
       200: queueSchema,
       400: t.String(),

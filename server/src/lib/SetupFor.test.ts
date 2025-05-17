@@ -3,6 +3,7 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres';
 import Logger from './Log';
+import { Wait } from 'testcontainers';
 // import postgres from 'postgres'
 
 // simple promise we can wait for to 'sleep'
@@ -15,7 +16,9 @@ export async function setupDockerTestDb() {
   // @see https://www.answeroverflow.com/m/1128519076952682517
   Logger.info('setting up pg container');
   try {
-    const container = await new PostgreSqlContainer('postgres:17').start();
+    // const container = await new PostgreSqlContainer('postgres:17').start();
+    const container = await new PostgreSqlContainer('postgres:17')
+      .withWaitStrategy(Wait.forLogMessage('ready to accept connections',2)).start();
 
     const connectionString = container.getConnectionUri();
     // we set this so that bun picks it up when the classes start to load

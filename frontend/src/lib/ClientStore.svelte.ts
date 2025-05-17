@@ -38,13 +38,21 @@ const loadedToken = localStorage.getItem('token');
 if(loadedToken && loadedToken.length > 0) {
   console.log('loaded token from localstorage');
 
-  const res = await fetch('/api/user/profile', {
+  fetch('/api/user/profile', {
     headers: {'x-cflr-token': loadedToken}
+  }).then((res) => {
+    if(res.ok) {
+      res.json().then((data) => {
+        loginUser(loadedToken, data);
+      })
+    }
+  }).catch(() => {
+    console.log('error getting profile from token');
   });
-  if (res.ok) {
-    const profile = await res.json();
-    loginUser(loadedToken, profile);
-  }
+  // if (res.ok) {
+  //   const profile = await res.json();
+  //   loginUser(loadedToken, profile);
+  // }
 } else {
   console.log('didnt see a token to load');
 }

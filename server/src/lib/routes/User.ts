@@ -175,7 +175,7 @@ export const userGuard = new Elysia({name: 'loggedIn'})
         profile
       }
     })
-   .as('plugin');
+   .as('scoped');
 
 export const adminGuard = new Elysia({name: "admin"})
 .use(userGuard)
@@ -196,7 +196,7 @@ export const adminGuard = new Elysia({name: "admin"})
      Logger.info(`guard approved admin ${profile.displayName}`);
   }
 })
-.as('plugin'); // dunno what this does, but the onbefore wont trigger without it
+.as('scoped'); // dunno what this does, but the onbefore wont trigger without it
   
 
 export const UserEndpoints = new Elysia({ prefix: '/user' })

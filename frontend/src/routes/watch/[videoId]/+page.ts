@@ -1,5 +1,5 @@
 import type { PageLoad } from "./$types";
-import { type Video } from '@backend/db/schema';
+import type { Video } from '@backend/db/schema';
 
 export const load: PageLoad = async ({fetch, params}) => {
   console.log('retrieving video info for video ' + params.videoId );
@@ -10,7 +10,7 @@ export const load: PageLoad = async ({fetch, params}) => {
   }
   console.log(`fetch returned`);
   const items = await res.json();
-  console.log(items);
+  // console.log(items);
   return {
     video: items as Video,
   };

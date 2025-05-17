@@ -1,27 +1,33 @@
 <script lang="ts">
+import { goto } from "$app/navigation";
+import { admin, loggedIn } from "$lib/ClientStore.svelte";
 import QueueItem from "$lib/QueueItem.svelte";
 import { secureFetch } from "$lib/SecureFetch";
 import type { Queue } from "@backend/db/schema";
 import type { YTExtVideo } from "@backend/lib/db/Types";
 import { onMount } from "svelte";
 
-let queue: Queue[] = [];
-let selectedQueueItem: string;
+let queue: Queue[] = $state([]);//[];
 
-let searchQuery = '';
+let searchQuery = $state(''); //'';
 let pageNumber = 0;
 
-export let videos: YTExtVideo[] = [];
+async function updateQueue() {
+  console.log('queue was modified, trigger reload');
+  queue = await getQueue();
+}
+
+let videos: YTExtVideo[] = $state([]);//[];
 
 async function getQueue() : Promise<Queue[]> {
-    const resp = await fetch('api/queue');
-    if (!resp.ok) {
-      return [];
-    }
-
-    const data = await resp.json();
-    return data as Queue[];
+  const resp = await fetch('api/queue');
+  if (!resp.ok) {
+    return [];
   }
+
+  const data = await resp.json();
+  return data as Queue[];
+}
 
 
 async function saveAuthor(video: YTExtVideo) {
@@ -96,6 +102,12 @@ const submit = async (event: Event ) => {
 }
 
 onMount(async () => {
+  if( !loggedIn()) {
+    goto('/login');
+  }
+  if (!admin()) {
+    goto('/');
+  }
   queue = await getQueue();
 });
 
@@ -103,31 +115,42 @@ onMount(async () => {
 
 <div class="flex w-screen">
   <!-- Left Pane Queue -->
-  <div class="w-1/4 flex-none bg-gray-200 p-4">
-    {#if queue.length == 0}
-    nothing in queue
-    {:else}
-    {#each queue as item (item.id)}
-      <QueueItem item={item} />
-    {/each}
-    {/if}
+  <div class="w-1/4 flex-none bg-gray-200 p-2">
+    <div class="w-full flex flex-row justify-between">
+      <span class="p-2 font-semibold">Queue</span>
+      <button class="p-2 rounded-md hover:bg-gray-300 cursor-pointer"
+        onclick="{() => updateQueue()}"
+        aria-label="refresh queue">
+        <i class="fas fa-sync"></i>
+      </button>
+    </div>
+    <div class="w-full">
+      {#if queue.length == 0}
+      nothing in queue
+      {:else}
+      {#each queue as item (item.id)}
+      <div class="w-full border-b">
+        <QueueItem item={item} update={updateQueue}/>
+      </div>
+      {/each}
+      {/if}
+    </div>
   </div>
 
   <!-- Right Pane -->
   <div class="grow">
-    test 3
-    <form on:submit|preventDefault={submit} class="flex gap-x-2 p-8 bg-white rounded-lg w-full"> 
+    <form onsubmit={submit} class="flex gap-x-2 p-8 bg-white rounded-lg w-full"> 
       <input 
         type="text" 
         bind:value={searchQuery} 
         placeholder="Search videos..." 
         class="p-2 w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
       />
-      <button type="submit">Search</button>
+      <button type="submit" class="p-2 rounded-md hover:bg-gray-300 cursor-pointer">Search</button>
     </form>
 
     {#if videos?.length > 0}
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-8 bg-white rounded-lg w-full">
+    <div class="grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-8 bg-white rounded-lg w-full">
       {#each videos as video, index (video.id)}
         <div class="flex flex-col bg-gray-100 shadow-md rounded-lg overflow-hidden hover:bg-gray-200 transition duration-300 relative">
 
@@ -140,8 +163,8 @@ onMount(async () => {
               <p class="text-gray-700">{video.authorName}</p>
             </div>
           </div>
-          <div class="flex justify-end space-x-2 p-2 button-group">
-            <button on:click|preventDefault={() => handleQueue(video)} class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded cursor-pointer" title="Queue" aria-label="queue">
+          <div class="flex justify-end space-x-2 p-2 ">
+            <button onclick={() => handleQueue(video)} class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded cursor-pointer" title="Queue" aria-label="queue">
               <i class="fas fa-tasks"></i>
             </button>
             <button class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded cursor-pointer" title="Download" aria-label="download">
@@ -159,33 +182,11 @@ onMount(async () => {
     </div>
     {:else}
       <div class="flex items-center justify-center p-8 bg-white rounded-lg w-full">
-        search something
+        search youtube for something..
       </div>
     {/if}   
   </div>
 </div>
 
 <style>
-  .button-group button {
-    margin-right: 5px; /* Adjust as necessary */
-  }
-
-  .button-group button:hover::after {
-    content: attr(title);
-    position: absolute;
-    top: -30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: black;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 12px;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-  }
-
-  .button-group button:hover::after {
-    opacity: 1;
-  }
 </style>
