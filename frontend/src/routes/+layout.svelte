@@ -8,7 +8,7 @@
 
 <nav class="bg-gray-800 text-white p-4 flex justify-between items-center">
 	<div class="flex space-x-4 items-center">
-		<a href="/" class="text-lg font-bold">Home</a>
+		<a href="/?offset=0" class="text-lg font-bold">Home</a>
 		<a href="/login" class="text-sm">Login</a>
 		<a href="/register" class="text-sm">Register</a>
 		{#if admin()}
