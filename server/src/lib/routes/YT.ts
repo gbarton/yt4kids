@@ -1090,7 +1090,7 @@ export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
     body: t.Object({
       videoId: t.String(),
       authorId: t.String(),
-      file: t.File(),
+      file: t.File( { maxSize: '2000m'}),
       authorThumbnails: t.Optional(t.Union([t.String(), t.Array(YTExtThumbnailSchema)])),
     }),
     response: {

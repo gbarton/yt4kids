@@ -27,7 +27,11 @@ Manager.getInstance();
 
 const PORT = +(Bun.env.YT_PORT || 3000);
 
-const app = new Elysia()
+const app = new Elysia( {
+  serve: {
+    maxRequestBodySize: 2 * 1000 * 1024 * 1024,
+  }
+})
   .use(Logger.into())
   .use(cors())
   .use(swagger())
@@ -35,7 +39,7 @@ const app = new Elysia()
     assets: 'public/',
     prefix: '/',
   }))
-  .group('/api', (api) => 
+  .group('/api', (api) =>
     api
       .get('', () => "Hello Elysia")
       .use(UserEndpoints)
