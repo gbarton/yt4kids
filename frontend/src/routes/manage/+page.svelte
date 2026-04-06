@@ -202,6 +202,9 @@ onMount(async () => {
             <button onclick={() => openUploadModal(video)} class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded cursor-pointer" title="Upload Video" aria-label="upload">
               <i class="fas fa-upload"></i>
             </button>
+            <a href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer" class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded cursor-pointer" title="Watch on YouTube" aria-label="watch on youtube">
+              <i class="fab fa-youtube"></i>
+            </a>
             <button class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded cursor-pointer" title="Details" aria-label="details">
               <i class="fas fa-info-circle"></i>
             </button>
