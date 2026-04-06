@@ -56,8 +56,18 @@
     <div class="p-4 flex-grow">
       <h3 class="text-md font-medium">{video.title}</h3>
       <div class="flex items-center mt-2">
-        <img src="{getAuthorThumbURL(authors[video.authorId])}" alt="avatar" class="w-10 h-10 rounded-full mr-2" />
-        <p class="text-gray-700">{authors[video.authorId].name}</p>
+        <img
+          src="{getAuthorThumbURL(authors[video.authorId])}"
+          alt="avatar"
+          class="w-10 h-10 rounded-full mr-2 cursor-pointer hover:opacity-80"
+          onclick={(e) => { e.preventDefault(); e.stopPropagation(); goto(`/?authorId=${authors[video.authorId].id}`); }}
+        />
+        <span
+          class="text-gray-700 hover:text-indigo-600 cursor-pointer"
+          onclick={(e) => { e.preventDefault(); e.stopPropagation(); goto(`/?authorId=${authors[video.authorId].id}`); }}
+        >
+          {authors[video.authorId].name}
+        </span>
       </div>
     </div>
   </a>
