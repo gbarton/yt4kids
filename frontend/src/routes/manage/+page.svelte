@@ -176,6 +176,13 @@ onMount(async () => {
       {#each videos as video, index (video.id)}
         <div class="flex flex-col bg-gray-100 shadow-md rounded-lg overflow-hidden hover:bg-gray-200 transition duration-300 relative">
 
+          <!-- Downloaded badge -->
+          {#if video.downloaded}
+            <div class="absolute top-2 left-2 z-10 bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded-md shadow flex items-center gap-1">
+              <i class="fas fa-check"></i> Downloaded
+            </div>
+          {/if}
+
           <img src={video.thumbnails[0].url} alt={video.title} class="w-full h-auto" />
 
           <div class="p-4 flex-grow">
