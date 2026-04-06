@@ -21,7 +21,7 @@
 
 {#if data.video}
 <div class="video-container flex flex-col">
-  <video controls class="video-player" src={`../api/videos/${data.video.id}/chunk`}>
+  <video controls class="video-player" src={`/api/videos/${data.video.id}/chunk`}>
     <track kind="captions" srclang="en" label="English Captions"/>
   </video>
   <h3 class="text-2xl font-bold"> {data.video.title} </h3>

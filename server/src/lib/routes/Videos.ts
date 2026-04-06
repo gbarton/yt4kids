@@ -137,6 +137,7 @@ export class Videos {
 
 const contentType: {[key: string]: string} = {
   "mp4": "video/mp4",
+  "webm": "video/webm",
 }
 
 export const VideoEndpoints = new Elysia({ prefix: '/videos' })
@@ -226,8 +227,9 @@ export const VideoEndpoints = new Elysia({ prefix: '/videos' })
       headerCode = 206;
     } else {
       stream = createReadStream(path);
+      set.headers['Accept-Ranges'] = 'bytes';
       set.headers['Content-Length'] = `${fileSize}`;
-      set.headers['Content-Type'] = 'video/mp4';
+      set.headers['Content-Type'] = contentType[record.fileExtention] || 'video/mp4';
       // ? do I need this?
       // set.headers['Content-Disposition'] = ContentDisposition(path),
       // headers = {
