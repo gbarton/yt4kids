@@ -11,7 +11,7 @@ import { eq } from 'drizzle-orm';
 const TOKEN_KEY = "x-cflr-token";
 const PW_LENGTH = 4;
 
-class User {
+export class User {
 
   constructor() {
     Logger.info("User obj online");

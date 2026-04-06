@@ -243,23 +243,25 @@ export const VideoEndpoints = new Elysia({ prefix: '/videos' })
   }, {
     params: t.Object({id: t.String()})
   })
-  .get('/:id/thumbnail', async ({error, set, videos, params: { id }}) => {
+  .get('/:id/thumbnail', async ({set, videos, params: { id }}) => {
     const fileInfo = await videos.getBestThumbnailForVideo(id);
     if (!fileInfo || fileInfo === undefined) {
-      Logger.warn(`could not find the thumbnail file`);
-      return error(400, 'file meta not found');
-    } 
-  
+      Logger.warn(`could not find the thumbnail file for video ${id}`);
+      set.status = 404;
+      return 'thumbnail not found';
+    }
+
     const file = Bun.file(fileInfo.filename);
     if (!file.exists()) {
       Logger.warn(`missing thumbnail for video ${id} at: ${fileInfo.filename}`);
+      set.status = 404;
+      return 'thumbnail file missing';
     }
-    const stream = file.stream();
 
     set.headers['Content-Length'] = `${fileInfo.contentLength}`;
-    set.headers['Content-Type'] = 'image/jpg';
-    
-    return stream;
+    set.headers['Content-Type'] = 'image/jpeg';
+
+    return file;
   }, {
     params: t.Object({id: t.String()}),
   });

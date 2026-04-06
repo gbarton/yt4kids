@@ -2,6 +2,7 @@
 import { goto } from "$app/navigation";
 import { admin, loggedIn } from "$lib/ClientStore.svelte";
 import QueueItem from "$lib/QueueItem.svelte";
+import UploadModal from "$lib/UploadModal.svelte";
 import { secureFetch } from "$lib/SecureFetch";
 import type { Queue } from "@backend/db/schema";
 import type { YTExtVideo } from "@backend/lib/db/Types";
@@ -68,6 +69,27 @@ async function queueVideo(videoId: string, authorId: string, title: string) {
 async function handleQueue(video: YTExtVideo) {
   await saveAuthor(video);
   await queueVideo(video.id, video.authorId, video.title);
+}
+
+// Upload modal state
+let showUploadModal = $state(false);
+let uploadVideoTarget: YTExtVideo | null = $state(null);
+
+function openUploadModal(video: YTExtVideo) {
+  uploadVideoTarget = video;
+  showUploadModal = true;
+}
+
+function closeUploadModal() {
+  showUploadModal = false;
+  uploadVideoTarget = null;
+}
+
+async function onUploadComplete() {
+  showUploadModal = false;
+  uploadVideoTarget = null;
+  // Re-run search to show the video as downloaded
+  await submit(new Event('submit'));
 }
 
 const submit = async (event: Event ) => {
@@ -170,6 +192,9 @@ onMount(async () => {
             <button class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded cursor-pointer" title="Download" aria-label="download">
               <i class="fas fa-download"></i>
             </button>
+            <button onclick={() => openUploadModal(video)} class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded cursor-pointer" title="Upload Video" aria-label="upload">
+              <i class="fas fa-upload"></i>
+            </button>
             <button class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded cursor-pointer" title="Details" aria-label="details">
               <i class="fas fa-info-circle"></i>
             </button>
@@ -187,6 +212,17 @@ onMount(async () => {
     {/if}   
   </div>
 </div>
+
+{#if showUploadModal && uploadVideoTarget}
+  <UploadModal
+    videoId={uploadVideoTarget.id}
+    authorId={uploadVideoTarget.authorId}
+    authorThumbnails={uploadVideoTarget.authorThumbnails}
+    title={uploadVideoTarget.title}
+    onClose={closeUploadModal}
+    onUploadComplete={onUploadComplete}
+  />
+{/if}
 
 <style>
 </style>

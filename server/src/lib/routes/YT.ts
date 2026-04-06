@@ -10,7 +10,7 @@ import * as Utils from '../utils/Utils';
 
 // import { RecordTypes, RecordTypesSchema, SearchOptions, SearchOptionsSchema, YTAuthor, YTChannelInfo, YTFile, YTQueue, YTSearchResponse, YTSearchResponseSchema, YTThumbnail, YTVideoInfo } from "../db/Types";
 
-import { type SearchOptions, SearchOptionsSchema, YTExtThumbnail, YTExtVideo, YTExtVideoSchema, type YTSearchResponse, YTSearchResponseSchema } from "../db/Types";
+import { type SearchOptions, SearchOptionsSchema, YTExtThumbnail, YTExtThumbnailSchema, YTExtVideo, YTExtVideoSchema, type YTSearchResponse, YTSearchResponseSchema } from "../db/Types";
 
 import crypto from 'crypto';
 import cp from 'child_process';
@@ -390,6 +390,121 @@ export class Tube {
     }
   }
 
+  /**
+   * Fetches video metadata from YouTube.
+   * Returns the metadata needed to create a video record, or an error object.
+   * Does NOT write to the DB — call saveVideoWithFile to persist.
+   */
+  async fetchVideoMetadata(videoId: string, authorId: string): Promise<{
+    title: string;
+    authorId: string;
+    authorName: string;
+    durationText: string;
+    durationSeconds: number;
+    fileExtention: string;
+    thumbnails: YTIThumbnail[];
+  } | { error: string }> {
+    const yt = await getYT();
+
+    let info: YTIVideoInfo;
+    try {
+      Logger.info('retrieving video info');
+      info = await yt.getBasicInfo(videoId);
+      Logger.info("info retrieved");
+    } catch (error) {
+      Logger.error(error);
+      return { error: 'Error Info for video was no good' };
+    }
+
+    if (!info || info === null)
+      return { error: 'ErrorCantConnectToServiceAPI' };
+
+    if (!info.playability_status || info.playability_status.status !== 'OK') return { error: 'ErrorYTUnavailable' };
+    if (info.basic_info.is_live) return { error: 'ErrorLiveVideo' };
+
+    if (info.basic_info.id !== videoId) {
+      return { error: 'ErrorCantConnectToServiceAPI' };
+    }
+
+    const { title, author } = info.basic_info;
+    Logger.trace(info.basic_info);
+
+    if (!title || !author) {
+      return { error: 'Missing title/author info for video' };
+    }
+
+    // Determine file extension
+    const format = "h264";
+    const codecMatch: Codecs = {
+      h264: { codec: "avc1", aCodec: "mp4a", fileExtention: "mp4", ffmpegArgs: [] },
+      av1: { codec: "av01", aCodec: "mp4a", fileExtention: "mp4", ffmpegArgs: [] },
+      vp9: { codec: "vp9", aCodec: "opus", fileExtention: "webm", ffmpegArgs: [] },
+    };
+
+    return {
+      title,
+      authorId,
+      authorName: author.name || 'Unknown',
+      durationText: `${info.basic_info.duration}`,
+      durationSeconds: info.basic_info.duration || 0,
+      fileExtention: codecMatch[format].fileExtention,
+      thumbnails: info.basic_info.thumbnail || [],
+    };
+  }
+
+  /**
+   * Saves author (if new), video record, and thumbnails to the DB.
+   * The file at `tmpFilePath` will be moved to the final storage location.
+   */
+  async saveVideoWithFile(videoId: string, authorId: string, tmpFilePath: string, metadata: {
+    title: string;
+    authorId: string;
+    authorName: string;
+    durationText: string;
+    durationSeconds: number;
+    fileExtention: string;
+    thumbnails: YTIThumbnail[];
+    authorThumbnails?: YTIThumbnail[];
+  }, contentLength: number) {
+    const finalFileName = videoStoragePath(authorId, metadata.title, metadata.fileExtention);
+    await rename(tmpFilePath, finalFileName);
+    Logger.info(`File Moved: ${tmpFilePath} to ${finalFileName}`);
+
+    // 1. Ensure author exists
+    const existingAuthor = await this.authors.getAuthor(authorId);
+    if (!existingAuthor) {
+      await this.authors.insertAuthor({
+        id: authorId,
+        name: metadata.authorName,
+        url: '',
+      });
+    }
+
+    // 2. Insert video record
+    const videoRecord: VideoInsert = {
+      title: metadata.title,
+      authorId,
+      durationText: metadata.durationText,
+      durationSeconds: metadata.durationSeconds,
+      id: videoId,
+      fileExtention: metadata.fileExtention,
+      filename: finalFileName,
+      contentLength,
+    };
+
+    await this.videos.insertVideo(videoRecord);
+
+    // 3. Save author profile thumbnails (for avatar display)
+    if (metadata.authorThumbnails && metadata.authorThumbnails.length > 0) {
+      await this.saveThumbnails(authorId, metadata.authorThumbnails);
+    }
+
+    // 4. Save video thumbnails linked to this video
+    await this.saveThumbnails(authorId, metadata.thumbnails, videoId);
+
+    return { videoId, authorId, filename: finalFileName };
+  }
+
   async downloadYTVideo(videoId: string, authorId: string) {
     const yt = await getYT();
     const fPath = await getFFMPEGPath();
@@ -416,25 +531,25 @@ export class Tube {
           ffmpegArgs: ["-c:v", "copy", "-c:a", "copy"],
       }
     }
-  
+
     let info : YTIVideoInfo;
     try {
       Logger.info('retrieving video info');
       info = await yt.getBasicInfo(videoId);
       Logger.info("info retrieved");
-  
+
     } catch (error) {
       Logger.error(error);
       return { error: 'Error Info for video was no good' };
     }
-  
+
     // TODO: sort out errors
     if (!info || info === null)
       return { error: 'ErrorCantConnectToServiceAPI' };
-  
+
     if (!info.playability_status || info.playability_status.status !== 'OK') return { error: 'ErrorYTUnavailable' };
     if (info.basic_info.is_live) return { error: 'ErrorLiveVideo' };
-  
+
     // return a critical error if returned video is "Video Not Available"
     // or a similar stub by youtube
     if (info.basic_info.id !== videoId) {
@@ -442,7 +557,7 @@ export class Tube {
             error: 'ErrorCantConnectToServiceAPI'
         }
     }
-  
+
     if (info.streaming_data == null) {
       return { error: "missing streaming info"};
     }
@@ -450,16 +565,16 @@ export class Tube {
     let hasAudio: boolean = false;
     const { title, author } = info.basic_info;
     Logger.trace(info.basic_info);
-  
+
     if (!title || !author) {
       return { error: 'Missing title/author info for video'};
     }
-  
+
     // remove formats that we dont want from the list
-    const filterByCodec = (formats: YTIFormat[] ) => formats.filter(e => 
+    const filterByCodec = (formats: YTIFormat[] ) => formats.filter(e =>
       e.mime_type.includes(codecMatch[format].codec) || e.mime_type.includes(codecMatch[format].aCodec)
     ).sort((a, b) => Number(b.bitrate) - Number(a.bitrate));
-  
+
     // all valid formats sorted by highest bitrate
     let adaptiveFormats = filterByCodec(info.streaming_data.adaptive_formats);
     // if none found using vp9, fall back to h264
@@ -467,30 +582,30 @@ export class Tube {
         format = "h264"
         adaptiveFormats = filterByCodec(info.streaming_data.adaptive_formats)
     }
-  
+
     // the first one we find with a video and content will be the best we can get
     const bestVideoFormat = adaptiveFormats.find(i => i.has_video && i.content_length && i.quality_label);
-  
+
     if (!bestVideoFormat || bestVideoFormat === null) {
       return { error: "No suitable video format" }
     }
     Logger.debug(bestVideoFormat, "Best Video Format full");
     // we know we have a label, we tested for it
     videoQuality = bestVideoFormat.quality_label || "";
-  
+
     Logger.info(`best quality found: ${videoQuality}`);
     Logger.info(`codec used: ${format}`);
-  
+
     // do we have the audio included already?
     hasAudio = bestVideoFormat.has_audio;
     Logger.info(`Video has audio ${hasAudio}`);
-  
+
     let type: dlType = 'video+audio';
     if (!hasAudio) {
       type = 'video';
       Logger.info('need to download separate audio file');
     }
-  
+
     // download video
     let dlObj : DLOpts = {
       type: type,
@@ -501,32 +616,32 @@ export class Tube {
       contentLength: bestVideoFormat.content_length || 0,
       client: 'TV'
     }
-  
+
     const tmpVideoFile = tmpFilePath();
     let finalTmpFile = tmpVideoFile;
     // TODO: wrap in retry logic!
     await download(videoId, dlObj, tmpVideoFile);
-  
+
     if (!hasAudio) {
       const filteredAudioFormats = adaptiveFormats.filter((i) => i.has_audio)
       .sort((a, b) => Number(b.bitrate) - Number(a.bitrate));
       Logger.debug(filteredAudioFormats.map((f) => (printAdaptiveFormat(f))), "Filtered Audio Formats");
       const bestAudioFormat = filteredAudioFormats.find((i) => i.has_audio && i.content_length);
-  
+
       if (!bestAudioFormat || bestAudioFormat === null) {
         return { error: "No suitable audio format" }
       }
       Logger.debug(bestAudioFormat, "Best Audio Format full");
-  
+
       dlObj = {
         type: 'audio',
         quality: 'best',
         contentLength: bestAudioFormat.content_length || 0,
         client: 'TV',
       }
-  
+
       const tmpAudioFile = tmpFilePath();
-  
+
       // if audio fails, we need to remove the tmp video file
       let i = 0;
       while (i < 3) {
@@ -542,15 +657,15 @@ export class Tube {
           }
         }
       }
-  
+
       const combinedFile = `${tmpFilePath(codecMatch[format].fileExtention)}`;
-  
+
       // combine with ffmpeg
       // https://stackoverflow.com/questions/72176714/merge-video-and-audio-using-ffmpeg-in-express-js
       // https://stackoverflow.com/questions/71257182/merge-audio-with-video-stream-node-js
       // but mostly
       // https://github.com/imputnet/cobalt/blob/b1ed1f519985daa20f9c35145ada260d902fa0d8/src/modules/stream/types.js#L86
-  
+
       let ffmpegCmd: string[] = [
         // supress non-crucial messages
         '-loglevel', '8', '-hide_banner',
@@ -562,11 +677,11 @@ export class Tube {
         // '-c:a', 'aac', '-vf', 'yuv420p', '-movflags', '+faststart',
         // `${combinedFile}`
       ];
-  
+
       ffmpegCmd = ffmpegCmd.concat(codecMatch[format].ffmpegArgs);
       ffmpegCmd.push(combinedFile);
       Logger.info(`${fPath} ${ffmpegCmd.join(" ")}`);
-        
+
       const ffmpegP = new Promise((resolve, reject) => {
         // TODO: ffmpegPath can be null
         const ffmpegProcess = cp.spawn(fPath || "", ffmpegCmd,
@@ -577,7 +692,7 @@ export class Tube {
             'pipe', 'pipe', 'pipe',
           ],
         });
-  
+
         ffmpegProcess.on('close', () => {
           Logger.info("Merging Completed");
           resolve(combinedFile);
@@ -586,10 +701,10 @@ export class Tube {
           Logger.error(err, 'could not ffmpeg');
           reject();
         });
-  
+
         Logger.info('ffmpeg initialization completed');
       });
-  
+
       await ffmpegP;
       Logger.info('completed ffmpeg video merging');
       finalTmpFile = combinedFile;
@@ -601,7 +716,7 @@ export class Tube {
     }
 
     const finalFileName = videoStoragePath(authorId, title);
-  
+
     await rename(finalTmpFile, finalFileName);
     Logger.info(`File Moved: ${finalTmpFile} to ${finalFileName}`);
     const writtenFile = Bun.file(finalFileName);
@@ -617,10 +732,10 @@ export class Tube {
       filename: finalFileName,
       contentLength: writtenFile.size,
     }
-  
+
     await this.videos.insertVideo(videoRecord);
     await this.saveThumbnails(authorId, info.basic_info.thumbnail || [], videoId);
-  
+
     return { videoId, authorId }
   }
   
@@ -929,4 +1044,62 @@ export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
       authorId: t.String(),
       videoId: t.String(),
     })
+  })
+  // manual video upload - fetches metadata from YT, accepts video file upload
+  .post('/upload', async ({yt, error, body}) => {
+    const { videoId, authorId, file, authorThumbnails } = body;
+
+    // First fetch metadata from YouTube
+    const metadata = await yt.fetchVideoMetadata(videoId, authorId);
+    if ('error' in metadata) {
+      return error(500, metadata.error);
+    }
+
+    // Save the uploaded file to a temp location
+    const tmpFile = tmpFilePath(metadata.fileExtention);
+    await Bun.write(tmpFile, file);
+
+    const contentLength = getFilesizeInBytes(tmpFile);
+
+    // Parse author thumbnails (may come as JSON string from FormData)
+    let parsedAuthorThumbnails: YTIThumbnail[] | undefined;
+    if (authorThumbnails) {
+      if (typeof authorThumbnails === 'string') {
+        parsedAuthorThumbnails = JSON.parse(authorThumbnails);
+      } else {
+        parsedAuthorThumbnails = authorThumbnails;
+      }
+    }
+
+    // Merge author thumbnails from the frontend (search result)
+    const fullMetadata = { ...metadata, authorThumbnails: parsedAuthorThumbnails };
+
+    // Now save the video record with the uploaded file
+    try {
+      const result = await yt.saveVideoWithFile(videoId, authorId, tmpFile, fullMetadata, contentLength);
+      return result;
+    } catch (err) {
+      Logger.error(err, 'failed to save uploaded video');
+      // clean up temp file
+      if (existsSync(tmpFile)) {
+        rm(tmpFile);
+      }
+      return error(500, 'failed to save video');
+    }
+  }, {
+    body: t.Object({
+      videoId: t.String(),
+      authorId: t.String(),
+      file: t.File(),
+      authorThumbnails: t.Optional(t.Union([t.String(), t.Array(YTExtThumbnailSchema)])),
+    }),
+    response: {
+      200: t.Object({
+        videoId: t.String(),
+        authorId: t.String(),
+        filename: t.String(),
+      }),
+      400: t.String(),
+      500: t.String(),
+    }
   });

@@ -12,21 +12,17 @@ export class Thumbnails {
     }
     const db = await getDB();
     const inserts = await db.insert(ThumbnailTable).values(thumbnails).onConflictDoNothing().returning();
-    if(inserts.length == 0) {
-      Logger.info('already have thumbnails inserted');
-      return;
-    }
-    Logger.debug(`inserted thumbnail`);
+    Logger.debug(`inserted ${inserts.length} of ${thumbnails.length} thumbnails`);
 
-    // these are all for a video so lets populate the many to many table
+    // Always create the many-to-many links, even if thumbnails already existed
     if(videoId) {
-      const links : VideosToThumbnailInsert[] = inserts.map((t) => ({videoId, thumbnailId: t.id}))
+      // Use the original thumbnail IDs (they're the same whether newly inserted or pre-existing)
+      const links : VideosToThumbnailInsert[] = thumbnails.map((t) => ({videoId, thumbnailId: t.id}))
       Logger.debug(links, `video links for ${thumbnails.length} thumbnails`);
       const linked = await db.insert(VideosToThumbnailsTable).values(links).onConflictDoNothing().returning();
       Logger.debug(`inserted ${linked.length} video->thumbnail relations`);
     } else {
-      // these are author thumbnails so lets populate the many to many table
-      const links : AuthorsToThumbnailsInsert[] = inserts.map((t) => ({authorId: t.authorId, thumbnailId: t.id}));
+      const links : AuthorsToThumbnailsInsert[] = thumbnails.map((t) => ({authorId: t.authorId, thumbnailId: t.id}));
       Logger.debug(links, `author links for ${thumbnails.length} thumbnails`);
       const linked = await db.insert(AuthorsToThumbnailsTable).values(links).onConflictDoNothing().returning();
       Logger.debug(`inserted ${linked.length} author->thumbnail relations`);

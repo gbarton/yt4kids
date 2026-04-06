@@ -97,20 +97,19 @@ export const AuthorsEndpoints = new Elysia({ prefix: '/authors' })
   }, {
     params: t.Object({ id: t.String() }),
   })
-  .get('/:id/thumbnail', async ({error, set, authors, params: { id }}) => {
+  .get('/:id/thumbnail', async ({set, authors, params: { id }}) => {
     const fileInfo =  await authors.getBestThumbnailForAuthor(id);
     if (!fileInfo || fileInfo === undefined) {
-      Logger.warn(`could not find the thumbnail file`);
-      return error(400, 'file meta not found');
-    } 
-  
-    const file = Bun.file(fileInfo.filename);
-    const stream = file.stream();
+      Logger.warn(`could not find the thumbnail file for author ${id}`);
+      set.status = 404;
+      return 'thumbnail not found';
+    }
 
+    const file = Bun.file(fileInfo.filename);
     set.headers['Content-Length'] = `${fileInfo.contentLength}`;
-    set.headers['Content-Type'] = 'image/jpg';
-    
-    return stream;
+    set.headers['Content-Type'] = 'image/jpeg';
+
+    return file;
   }, {
     params: t.Object({id: t.String()}),
   });
