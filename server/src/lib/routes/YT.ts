@@ -1047,7 +1047,7 @@ export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
   })
   // manual video upload - fetches metadata from YT, accepts video file upload
   .post('/upload', async ({yt, error, body}) => {
-    const { videoId, authorId, file, authorThumbnails } = body;
+    const { videoId, authorId, authorName, file, authorThumbnails } = body;
 
     // First fetch metadata from YouTube
     const metadata = await yt.fetchVideoMetadata(videoId, authorId);
@@ -1071,8 +1071,11 @@ export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
       }
     }
 
+    // Use the author name from the frontend (search result), fall back to YT metadata
+    const resolvedAuthorName = authorName || metadata.authorName;
+
     // Merge author thumbnails from the frontend (search result)
-    const fullMetadata = { ...metadata, authorThumbnails: parsedAuthorThumbnails };
+    const fullMetadata = { ...metadata, authorName: resolvedAuthorName, authorThumbnails: parsedAuthorThumbnails };
 
     // Now save the video record with the uploaded file
     try {
@@ -1090,6 +1093,7 @@ export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
     body: t.Object({
       videoId: t.String(),
       authorId: t.String(),
+      authorName: t.Optional(t.String()),
       file: t.File( { maxSize: '2000m'}),
       authorThumbnails: t.Optional(t.Union([t.String(), t.Array(YTExtThumbnailSchema)])),
     }),

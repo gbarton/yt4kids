@@ -224,6 +224,7 @@ onMount(async () => {
   <UploadModal
     videoId={uploadVideoTarget.id}
     authorId={uploadVideoTarget.authorId}
+    authorName={uploadVideoTarget.authorName}
     authorThumbnails={uploadVideoTarget.authorThumbnails}
     title={uploadVideoTarget.title}
     onClose={closeUploadModal}

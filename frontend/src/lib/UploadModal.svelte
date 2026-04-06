@@ -6,6 +6,7 @@
   let {
     videoId,
     authorId,
+    authorName,
     authorThumbnails,
     title,
     onClose,
@@ -13,6 +14,7 @@
   }: {
     videoId: string;
     authorId: string;
+    authorName: string;
     authorThumbnails: { width: number; height: number; url: string; size: string }[];
     title: string;
     onClose: () => void;
@@ -67,6 +69,7 @@
     const formData = new FormData();
     formData.append('videoId', videoId);
     formData.append('authorId', authorId);
+    formData.append('authorName', authorName);
     formData.append('file', file);
     formData.append('authorThumbnails', JSON.stringify(authorThumbnails));
 
