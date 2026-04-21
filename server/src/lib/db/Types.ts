@@ -61,10 +61,21 @@ const YTRecordSchema = t.Object({
 export type YTRecord = typeof YTRecordSchema.static;
 
 
+export const YTSortSchema = t.Union([
+  t.Literal('latest'),
+  t.Literal('oldest'),
+  t.Literal('author'),
+  t.Literal('title')
+]);
+
+export type YTSort = typeof YTSortSchema.static;
+
+
 export const YTSearchSchema = t.Object({
   authorId: t.Optional(t.String()),
   search: t.Optional(t.String()),
   channelId: t.Optional(t.String()),
+  sort: t.Optional(YTSortSchema),
   limit: t.Number({minimum: 0, maximum: 50, default: 20}),
   offset: t.Number({minimum: 0, default: 0})
 });

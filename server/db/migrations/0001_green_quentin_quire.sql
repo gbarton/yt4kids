@@ -1,0 +1,1 @@
+ALTER TABLE "yt4kids"."video" ADD COLUMN "createdAt" timestamp DEFAULT now();

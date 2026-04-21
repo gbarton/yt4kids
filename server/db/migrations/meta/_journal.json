@@ -8,6 +8,13 @@
       "when": 1745759066180,
       "tag": "0000_nebulous_mockingbird",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776813219153,
+      "tag": "0001_green_quentin_quire",
+      "breakpoints": true
     }
   ]
 }

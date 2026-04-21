@@ -82,7 +82,8 @@ export const VideoTable = dbSchema.table("video", {
   format: varchar({length: 40}),
   fileExtention: varchar({length: 4}),
   filename: text(),
-  contentLength: bigint({mode: 'number'})
+  contentLength: bigint({mode: 'number'}),
+  createdAt: timestamp().defaultNow(),
 },
 (table) => [
   // an index that will search everything in lowercase

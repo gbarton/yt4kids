@@ -13,14 +13,20 @@ export const load: PageLoad = async ({fetch, url}) => {
   const limit: number = +(url.searchParams.get('limit') || 6);
   const search = url.searchParams.get('search') || '';
   const authorId = url.searchParams.get('authorId') || '';
+  const sort = url.searchParams.get('sort') || 'latest';
+
   if (url.searchParams.size > 0) {
     console.log('enough params to send');
     searchString += '?' + url.searchParams;
   } else {
-    searchString += `?limit=${limit}&offset=${offset}`; 
+    searchString += `?limit=${limit}&offset=${offset}&sort=${sort}`; 
   }
   
-  const res = await fetch('api/videos/search' + searchString);
+  const [res, authorsRes] = await Promise.all([
+    fetch('api/videos/search' + searchString),
+    fetch('api/authors?limit=1000')
+  ]);
+
   if (res.status !== 200) {
     console.log("error");
     return {};
@@ -28,6 +34,13 @@ export const load: PageLoad = async ({fetch, url}) => {
    console.log(`fetch returned`);
   const items = await res.json();
   const searchResults = items as YTSearchResponse;
+
+  let allAuthors: Author[] = [];
+  if (authorsRes.ok) {
+    const authorsData = await authorsRes.json();
+    allAuthors = authorsData.authors;
+  }
+
   // new data
   if (offset == 0) {
     console.log('new search');
@@ -45,7 +58,9 @@ export const load: PageLoad = async ({fetch, url}) => {
     limit,
     authorId,
     search,
+    sort,
     videos,
     authors,
+    allAuthors,
   };
 };

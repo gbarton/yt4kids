@@ -52,6 +52,23 @@ export class Videos {
   async getVideos(searchOpts: YTSearch) {
     const db = await getDB();
 
+    let orderBy;
+    switch (searchOpts.sort) {
+      case 'oldest':
+        orderBy = [VideoTable.createdAt];
+        break;
+      case 'author':
+        orderBy = [AuthorTable.name, VideoTable.title];
+        break;
+      case 'title':
+        orderBy = [VideoTable.title];
+        break;
+      case 'latest':
+      default:
+        orderBy = [desc(VideoTable.createdAt)];
+        break;
+    }
+
     let query = db.select().from(VideoTable)
       .fullJoin(AuthorTable, eq(VideoTable.authorId, AuthorTable.id))
       .where(
@@ -60,7 +77,7 @@ export class Videos {
           searchOpts.search? like(lower(VideoTable.title), `%${searchOpts.search.toLowerCase()}%`) : undefined
         )
       )
-      .orderBy(VideoTable.title)
+      .orderBy(...orderBy)
       .limit(searchOpts.limit)
       .offset(searchOpts.offset);
 
