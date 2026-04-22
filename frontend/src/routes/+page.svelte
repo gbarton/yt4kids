@@ -9,28 +9,28 @@
   let authors = $derived(data.authors);
   let more = $derived(data.more);
   let isCollapsed = $state(false);
+  let isLoading = $state(false);
 
   function loadMore(node: Element) {
-    const obs = new IntersectionObserver((entries) => {
+    const obs = new IntersectionObserver(async (entries) => {
       // I think this only fires once because we are just tied to the window
-      entries.forEach((entry) => {
+      for (const entry of entries) {
         console.log('here');
         console.log(entry);
-        if (entry.isIntersecting) {
+        if (entry.isIntersecting && more && !isLoading) {
           console.log('intersection detected');
-          // guard against infinite queries
-          if (more) {
-            const params = new URLSearchParams(window.location.search);
-            params.set('limit', data.limit.toString());
-            params.set('offset', (videos?.length || 0).toString());
-            goto(`/?${params.toString()}`, {
-              // replaceState: true,
-              noScroll: true,
-              keepFocus: true,
-            });
-          }
+          isLoading = true;
+          const params = new URLSearchParams(window.location.search);
+          params.set('limit', (data.limit || 9).toString());
+          params.set('offset', (videos?.length || 0).toString());
+          await goto(`/?${params.toString()}`, {
+            // replaceState: true,
+            noScroll: true,
+            keepFocus: true,
+          });
+          isLoading = false;
         }
-      });
+      }
     },
     {
       // threshold: 0.1 , // 10%
@@ -164,9 +164,11 @@
       {/if}
       <Videos videos={videos} authors={authors} />
       {#if more}
-      <div use:loadMore class="p-8 text-center text-gray-400">
-        <i class="fas fa-spinner fa-spin mr-2"></i> Loading more...
-      </div>
+        {#key videos.length}
+          <div use:loadMore class="p-8 text-center text-gray-400">
+            <i class="fas fa-spinner fa-spin mr-2"></i> Loading more...
+          </div>
+        {/key}
       {/if}
     {:else if videos && videos.length == 0 && data.offset == 0}
     <div class="flex flex-col justify-center items-center h-full min-h-[50vh]">

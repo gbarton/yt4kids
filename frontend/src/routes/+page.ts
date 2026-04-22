@@ -10,7 +10,7 @@ export const load: PageLoad = async ({fetch, url}) => {
   
   let searchString = '';
   const offset: number = +(url.searchParams.get('offset') || 0);
-  const limit: number = +(url.searchParams.get('limit') || 6);
+  const limit: number = +(url.searchParams.get('limit') || 9);
   const search = url.searchParams.get('search') || '';
   const authorId = url.searchParams.get('authorId') || '';
   const sort = url.searchParams.get('sort') || 'latest';
@@ -53,7 +53,7 @@ export const load: PageLoad = async ({fetch, url}) => {
   }
 
   return {
-    more: searchResults?.videos.length > 0 ? true : false,
+    more: searchResults?.videos.length === limit,
     offset,
     limit,
     authorId,
