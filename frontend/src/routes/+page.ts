@@ -24,7 +24,7 @@ export const load: PageLoad = async ({fetch, url}) => {
   
   const [res, authorsRes] = await Promise.all([
     fetch('api/videos/search' + searchString),
-    fetch('api/authors?limit=1000')
+    fetch('api/authors?limit=1000&withVideosOnly=true')
   ]);
 
   if (res.status !== 200) {

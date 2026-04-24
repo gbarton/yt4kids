@@ -1,8 +1,8 @@
 import { Elysia, t } from 'elysia';
 import Logger from '../Log';
-import { type AuthorInsert, authorInsertSchema, AuthorsToThumbnailsTable, AuthorTable, ThumbnailTable } from '../../db/schema';
+import { type AuthorInsert, authorInsertSchema, AuthorsToThumbnailsTable, AuthorTable, ThumbnailTable, VideoTable } from '../../db/schema';
 import { getDB } from '../../db/DB';
-import { and, asc, desc, eq, isNotNull, like } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, isNotNull, like } from 'drizzle-orm';
 
 export class Authors {
   constructor() {}
@@ -16,12 +16,17 @@ export class Authors {
     return auth[0];
   }
 
-  public async getAuthors(query: string | null, limit: number, offset: number) {
+  public async getAuthors(query: string | null, limit: number, offset: number, withVideosOnly: boolean = false) {
     const db = await getDB();
     const results = await db.select()
     .from(AuthorTable)
     .where(
-      query !== null ? like(AuthorTable.name, `%${query}%`) : undefined,
+      and(
+        query !== null ? like(AuthorTable.name, `%${query}%`) : undefined,
+        withVideosOnly ? exists(
+          db.select().from(VideoTable).where(eq(VideoTable.authorId, AuthorTable.id))
+        ) : undefined
+      )
     )
     .orderBy(asc(AuthorTable.name))
     .limit(limit)
@@ -69,8 +74,8 @@ export class Authors {
 
 export const AuthorsEndpoints = new Elysia({ prefix: '/authors' })
   .decorate('authors', new Authors())
-  .get('', async ({ authors, query: {query, limit, offset} }) => {
-    const arr = await authors.getAuthors(query || null, limit, offset);
+  .get('', async ({ authors, query: {query, limit, offset, withVideosOnly} }) => {
+    const arr = await authors.getAuthors(query || null, limit, offset, withVideosOnly);
     return {
       query,
       authors : arr ? arr : [],
@@ -80,6 +85,7 @@ export const AuthorsEndpoints = new Elysia({ prefix: '/authors' })
       query: t.Optional(t.String()),
       offset: t.Integer({default:0}),
       limit: t.Integer({default:20}),
+      withVideosOnly: t.Optional(t.Boolean({default: false}))
     }),
   })
   .post('', async ({ authors, body }) => {
