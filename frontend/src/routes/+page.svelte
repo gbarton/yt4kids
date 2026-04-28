@@ -11,38 +11,35 @@
   let isCollapsed = $state(false);
   let isLoading = $state(false);
 
+  let isIntersecting = $state(false);
+
   function loadMore(node: Element) {
-    const obs = new IntersectionObserver(async (entries) => {
-      // I think this only fires once because we are just tied to the window
-      for (const entry of entries) {
-        console.log('here');
-        console.log(entry);
-        if (entry.isIntersecting && more && !isLoading) {
-          console.log('intersection detected');
-          isLoading = true;
-          const params = new URLSearchParams(window.location.search);
-          params.set('limit', (data.limit || 9).toString());
-          params.set('offset', (videos?.length || 0).toString());
-          await goto(`/?${params.toString()}`, {
-            // replaceState: true,
-            noScroll: true,
-            keepFocus: true,
-          });
-          isLoading = false;
-        }
-      }
-    },
-    {
-      // threshold: 0.1 , // 10%
+    const obs = new IntersectionObserver((entries) => {
+      isIntersecting = entries[0].isIntersecting;
     });
 
     obs.observe(node);
     return {
-      destroy: () => {
-        console.log('destroyed obervable')
-        obs.disconnect();
-      }
+      destroy: () => obs.disconnect()
     }
+  }
+
+  $effect(() => {
+    if (isIntersecting && more && !isLoading) {
+      loadNextPage();
+    }
+  });
+
+  async function loadNextPage() {
+    isLoading = true;
+    const params = new URLSearchParams(window.location.search);
+    params.set('limit', (data.limit || 9).toString());
+    params.set('offset', (videos?.length || 0).toString());
+    await goto(`/?${params.toString()}`, {
+      noScroll: true,
+      keepFocus: true,
+    });
+    isLoading = false;
   }
 
   function clearFilter() {
@@ -164,11 +161,9 @@
       {/if}
       <Videos videos={videos} authors={authors} />
       {#if more}
-        {#key videos.length}
-          <div use:loadMore class="p-8 text-center text-gray-400">
-            <i class="fas fa-spinner fa-spin mr-2"></i> Loading more...
-          </div>
-        {/key}
+        <div use:loadMore class="p-8 text-center text-gray-400">
+          <i class="fas fa-spinner fa-spin mr-2"></i> Loading more...
+        </div>
       {/if}
     {:else if videos && videos.length == 0 && data.offset == 0}
     <div class="flex flex-col justify-center items-center h-full min-h-[50vh]">

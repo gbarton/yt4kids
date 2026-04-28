@@ -5,23 +5,22 @@ import type { YTSearchResponse } from "@backend/lib/db/Types";
 
 let videos: Video[] = [];
 let authors: Record<string, Author> = {};
-
 export const load: PageLoad = async ({fetch, url}) => {
-  
-  let searchString = '';
-  const offset: number = +(url.searchParams.get('offset') || 0);
-  const limit: number = +(url.searchParams.get('limit') || 9);
-  const search = url.searchParams.get('search') || '';
-  const authorId = url.searchParams.get('authorId') || '';
-  const sort = url.searchParams.get('sort') || 'latest';
 
-  if (url.searchParams.size > 0) {
-    console.log('enough params to send');
-    searchString += '?' + url.searchParams;
-  } else {
-    searchString += `?limit=${limit}&offset=${offset}&sort=${sort}`; 
-  }
-  
+  const params = new URLSearchParams(url.searchParams);
+  const offset = +(params.get('offset') || 0);
+  const limit = +(params.get('limit') || 9);
+  const sort = params.get('sort') || 'latest';
+  const authorId = params.get('authorId') || '';
+  const search = params.get('search') || '';
+
+  // Ensure defaults are present in the search string sent to the API
+  if (!params.has('limit')) params.set('limit', limit.toString());
+  if (!params.has('offset')) params.set('offset', offset.toString());
+  if (!params.has('sort')) params.set('sort', sort);
+
+  const searchString = '?' + params.toString();
+
   const [res, authorsRes] = await Promise.all([
     fetch('api/videos/search' + searchString),
     fetch('api/authors?limit=1000&withVideosOnly=true')
