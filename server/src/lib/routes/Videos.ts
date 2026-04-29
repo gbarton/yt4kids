@@ -4,7 +4,7 @@ import { getDB } from '../../db/DB';
 import { type YTSearch, YTSearchResponseSchema, YTSearchSchema } from '../db/Types';
 import { existsSync, createReadStream, ReadStream } from 'node:fs';
 import { type Author, AuthorTable, lower, ThumbnailTable, type VideoInsert, videoSchema, VideosToThumbnailsTable, VideoTable } from '../../db/schema';
-import { and, desc, eq, isNotNull, like } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, like } from 'drizzle-orm';
 
 export class Videos {
   constructor() {}
@@ -55,7 +55,7 @@ export class Videos {
     let orderBy;
     switch (searchOpts.sort) {
       case 'oldest':
-        orderBy = [VideoTable.createdAt];
+        orderBy = [asc(VideoTable.createdAt).nullsLast()];
         break;
       case 'author':
         orderBy = [AuthorTable.name, VideoTable.title];
@@ -65,12 +65,12 @@ export class Videos {
         break;
       case 'latest':
       default:
-        orderBy = [desc(VideoTable.createdAt)];
+        orderBy = [desc(VideoTable.createdAt).nullsLast()];
         break;
     }
 
     let query = db.select().from(VideoTable)
-      .fullJoin(AuthorTable, eq(VideoTable.authorId, AuthorTable.id))
+      .innerJoin(AuthorTable, eq(VideoTable.authorId, AuthorTable.id))
       .where(
         and(
           searchOpts.authorId ? eq(VideoTable.authorId, searchOpts.authorId) : undefined,
