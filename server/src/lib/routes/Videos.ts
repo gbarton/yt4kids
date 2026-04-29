@@ -70,7 +70,7 @@ export class Videos {
     }
 
     let query = db.select().from(VideoTable)
-      .innerJoin(AuthorTable, eq(VideoTable.authorId, AuthorTable.id))
+      .leftJoin(AuthorTable, eq(VideoTable.authorId, AuthorTable.id))
       .where(
         and(
           searchOpts.authorId ? eq(VideoTable.authorId, searchOpts.authorId) : undefined,
