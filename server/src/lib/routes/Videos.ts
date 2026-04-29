@@ -55,22 +55,26 @@ export class Videos {
     let orderBy;
     switch (searchOpts.sort) {
       case 'oldest':
-        orderBy = [asc(VideoTable.createdAt).nullsLast()];
+        orderBy = [asc(VideoTable.createdAt)];
         break;
       case 'author':
-        orderBy = [AuthorTable.name, VideoTable.title];
+        orderBy = [asc(AuthorTable.name), asc(VideoTable.title)];
         break;
       case 'title':
-        orderBy = [VideoTable.title];
+        orderBy = [asc(VideoTable.title)];
         break;
       case 'latest':
       default:
-        orderBy = [desc(VideoTable.createdAt).nullsLast()];
+        orderBy = [desc(VideoTable.createdAt)];
         break;
     }
 
-    let query = db.select().from(VideoTable)
-      .leftJoin(AuthorTable, eq(VideoTable.authorId, AuthorTable.id))
+    let query = db.select({
+      video: VideoTable,
+      author: AuthorTable,
+    })
+    .from(VideoTable)
+      .innerJoin(AuthorTable, eq(VideoTable.authorId, AuthorTable.id))
       .where(
         and(
           searchOpts.authorId ? eq(VideoTable.authorId, searchOpts.authorId) : undefined,
