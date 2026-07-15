@@ -29,7 +29,7 @@ const PORT = +(Bun.env.YT_PORT || 3000);
 
 const app = new Elysia( {
   serve: {
-    maxRequestBodySize: 2 * 1000 * 1024 * 1024,
+    maxRequestBodySize: 3 * 1024 * 1024 * 1024,
   }
 })
   .use(Logger.into())
