@@ -20,6 +20,7 @@ import { VideoInfo as YTIVideoInfo } from "youtubei.js/dist/src/parser/youtube";
 import { Author as YTIAuthor, Format as YTIFormat, Thumbnail as YTIThumbnail } from "youtubei.js/dist/src/parser/misc";
 import { Video as YTIVideo } from "youtubei.js/dist/src/parser/nodes";
 import { Readable } from "stream";
+import busboy from 'busboy';
 import { adminGuard } from './User';
 import { Authors } from './Authors';
 import { Thumbnails } from './Thumbnails';
@@ -1046,57 +1047,85 @@ export const ExternalEndpoints = new Elysia({ prefix: '/ext' })
     })
   })
   // manual video upload - fetches metadata from YT, accepts video file upload
-  .post('/upload', async ({yt, error, body}) => {
-    const { videoId, authorId, authorName, file, authorThumbnails } = body;
-
-    // First fetch metadata from YouTube
-    const metadata = await yt.fetchVideoMetadata(videoId, authorId);
-    if ('error' in metadata) {
-      return error(500, metadata.error);
+  .post('/upload', async ({ request, yt, error }) => {
+    const contentType = request.headers.get('content-type');
+    if (!contentType) {
+      return error(400, 'Missing content-type header');
     }
 
-    // Save the uploaded file to a temp location
-    const tmpFile = tmpFilePath(metadata.fileExtention);
-    await Bun.write(tmpFile, file);
-
-    const contentLength = getFilesizeInBytes(tmpFile);
-
-    // Parse author thumbnails (may come as JSON string from FormData)
-    let parsedAuthorThumbnails: YTIThumbnail[] | undefined;
-    if (authorThumbnails) {
-      if (typeof authorThumbnails === 'string') {
-        parsedAuthorThumbnails = JSON.parse(authorThumbnails);
-      } else {
-        parsedAuthorThumbnails = authorThumbnails;
-      }
+    if (!request.body) {
+      return error(400, 'Missing request body');
     }
 
-    // Use the author name from the frontend (search result), fall back to YT metadata
-    const resolvedAuthorName = authorName || metadata.authorName;
+    const fields: Record<string, string> = {};
+    let filePath: string | null = null;
+    let contentLength = 0;
 
-    // Merge author thumbnails from the frontend (search result)
-    const fullMetadata = { ...metadata, authorName: resolvedAuthorName, authorThumbnails: parsedAuthorThumbnails };
+    return new Promise<any>((resolve) => {
+      const bb = busboy({ headers: { 'content-type': contentType } });
+      const nodeStream = Readable.fromWeb(request.body as any);
 
-    // Now save the video record with the uploaded file
-    try {
-      const result = await yt.saveVideoWithFile(videoId, authorId, tmpFile, fullMetadata, contentLength);
-      return result;
-    } catch (err) {
-      Logger.error(err, 'failed to save uploaded video');
-      // clean up temp file
-      if (existsSync(tmpFile)) {
-        rm(tmpFile);
-      }
-      return error(500, 'failed to save video');
-    }
+      bb.on('field', (name: string, val: string) => {
+        fields[name] = val;
+      });
+
+      bb.on('file', (_name: string, stream: Readable, info: { filename: string; encoding: string; mimeType: string }) => {
+        const ext = info.filename.split('.').pop() || 'mp4';
+        const tmpPath = tmpFilePath(ext);
+        filePath = tmpPath;
+        const writeStream = createWriteStream(tmpPath);
+        stream.on('data', (chunk: Buffer) => { contentLength += chunk.length; });
+        stream.on('error', () => stream.resume());
+        writeStream.on('error', () => {
+          stream.unpipe(writeStream);
+          stream.resume();
+        });
+        stream.pipe(writeStream);
+      });
+
+      bb.on('close', async () => {
+        try {
+          const { videoId, authorId, authorName, authorThumbnails } = fields;
+          if (!videoId || !authorId || !filePath) {
+            if (filePath && existsSync(filePath)) await rm(filePath);
+            resolve(error(400, !videoId ? 'Missing videoId' : !authorId ? 'Missing authorId' : 'Missing file'));
+            return;
+          }
+
+          const metadata = await yt.fetchVideoMetadata(videoId, authorId);
+          if ('error' in metadata) {
+            if (existsSync(filePath)) await rm(filePath);
+            resolve(error(500, metadata.error));
+            return;
+          }
+
+          let parsedAuthorThumbnails: YTIThumbnail[] | undefined;
+          if (authorThumbnails) {
+            try { parsedAuthorThumbnails = JSON.parse(authorThumbnails); } catch {}
+          }
+
+          const resolvedAuthorName = authorName || metadata.authorName;
+          const fullMetadata = { ...metadata, authorName: resolvedAuthorName, authorThumbnails: parsedAuthorThumbnails };
+
+          const result = await yt.saveVideoWithFile(videoId, authorId, filePath, fullMetadata, contentLength);
+          resolve(result);
+        } catch (err) {
+          Logger.error(err, 'failed to save uploaded video');
+          if (filePath && existsSync(filePath)) await rm(filePath);
+          resolve(error(500, 'failed to save video'));
+        }
+      });
+
+      bb.on('error', (err: Error) => {
+        Logger.error(err, 'upload parse error');
+        if (filePath && existsSync(filePath)) rm(filePath);
+        resolve(error(400, 'upload failed'));
+      });
+
+      nodeStream.pipe(bb);
+    });
   }, {
-    body: t.Object({
-      videoId: t.String(),
-      authorId: t.String(),
-      authorName: t.Optional(t.String()),
-      file: t.File( { maxSize: '2000m'}),
-      authorThumbnails: t.Optional(t.Union([t.String(), t.Array(YTExtThumbnailSchema)])),
-    }),
+    parse: 'none',
     response: {
       200: t.Object({
         videoId: t.String(),
